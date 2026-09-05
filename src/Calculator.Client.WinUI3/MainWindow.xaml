@@ -16,6 +16,18 @@
 
             <SolidColorBrush x:Key="MessageHintBrush" Color="{ThemeResource TextFillColorTertiary}" />
             <SolidColorBrush x:Key="MessageErrorBrush" Color="{ThemeResource SystemFillColorCritical}" />
+
+            <!-- Invisible until pointed at: only the theme's ordinary hover and pressed fills
+                 give it away, the same trick the built-in chrome buttons use for themselves. -->
+            <Style x:Key="StealthIconButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="Padding" Value="0" />
+                <Setter Property="Width" Value="36" />
+                <Setter Property="Height" Value="36" />
+                <Setter Property="HorizontalAlignment" Value="Center" />
+                <Setter Property="VerticalAlignment" Value="Center" />
+            </Style>
         </Grid.Resources>
 
         <Grid.RowDefinitions>
@@ -47,6 +59,7 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
             <TextBlock
@@ -74,6 +87,22 @@
                     TextWrapping="Wrap"
                     Visibility="Collapsed" />
             </Grid>
+
+            <!-- Shown only once there is a value on the line to copy — not while the box is
+                 empty, and not over a message, which has nothing to put on the clipboard. -->
+            <Button
+                x:Name="CopyResultButton"
+                Grid.Column="2"
+                Click="CopyResultButtonClick"
+                Style="{StaticResource StealthIconButtonStyle}"
+                Visibility="Collapsed"
+                AutomationProperties.Name="Copy result"
+                ToolTipService.ToolTip="Copy result">
+                <FontIcon
+                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                    FontSize="16"
+                    Glyph="&#xE8C8;" />
+            </Button>
         </Grid>
 
         <!-- Declared last so it lies over the input box it shares a row with. Its background is

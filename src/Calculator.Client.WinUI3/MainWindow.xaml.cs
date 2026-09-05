@@ -6,6 +6,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.System;
 
@@ -125,6 +126,7 @@ public sealed partial class MainWindow : Window
     {
         ResultText.Visibility = Visibility.Collapsed;
         MessageText.Visibility = Visibility.Collapsed;
+        CopyResultButton.Visibility = Visibility.Collapsed;
     }
 
     private void ShowValue(decimal value)
@@ -132,6 +134,7 @@ public sealed partial class MainWindow : Window
         ResultText.Text = Format(value);
         ResultText.Visibility = Visibility.Visible;
         MessageText.Visibility = Visibility.Collapsed;
+        CopyResultButton.Visibility = Visibility.Visible;
     }
 
     /// <summary>
@@ -145,6 +148,19 @@ public sealed partial class MainWindow : Window
         MessageText.Text = message;
         MessageText.Foreground = (Brush)RootGrid.Resources[isHint ? "MessageHintBrush" : "MessageErrorBrush"];
         MessageText.Visibility = Visibility.Visible;
+        CopyResultButton.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Puts the value currently on the result line onto the clipboard. There is nothing to read
+    /// this back from within the app — the box does not accept plain numbers as math input — so
+    /// this is purely for pasting the answer somewhere else.
+    /// </summary>
+    private void CopyResultButtonClick(object sender, RoutedEventArgs e)
+    {
+        var content = new DataPackage();
+        content.SetText(ResultText.Text);
+        Clipboard.SetContent(content);
     }
 
     private static string Format(decimal value) => value.ToString(ResultFormat, CultureInfo.CurrentCulture);
