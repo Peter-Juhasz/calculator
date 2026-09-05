@@ -22,15 +22,10 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// Up to twelve decimals are shown, grouped for reading. Trailing zeros are dropped, so a
-    /// whole number reads as one.
+    /// whole number reads as one. A division that does not come out even carries far more digits
+    /// than that, and is rounded to fit rather than run off the line.
     /// </summary>
     private const string ResultFormat = "#,##0.############";
-
-    /// <summary>
-    /// Where binary floating point stops being able to hold a decimal exactly. Rounding here
-    /// keeps 0.1 + 0.2 reading as 0.3 without touching any digit the reader typed.
-    /// </summary>
-    private const int SignificantDecimals = 12;
 
     public MainWindow()
     {
@@ -116,6 +111,10 @@ public sealed partial class MainWindow : Window
         {
             ShowMessage(exception.Message, isHint: false);
         }
+        catch (OverflowException)
+        {
+            ShowMessage("The result is too large to work out.", isHint: false);
+        }
     }
 
     private void ShowNothing()
@@ -124,7 +123,7 @@ public sealed partial class MainWindow : Window
         MessageText.Visibility = Visibility.Collapsed;
     }
 
-    private void ShowValue(double value)
+    private void ShowValue(decimal value)
     {
         ResultText.Text = Format(value);
         ResultText.Visibility = Visibility.Visible;
@@ -144,18 +143,5 @@ public sealed partial class MainWindow : Window
         MessageText.Visibility = Visibility.Visible;
     }
 
-    private static string Format(double value)
-    {
-        if (double.IsNaN(value))
-        {
-            return "Undefined";
-        }
-
-        if (double.IsInfinity(value))
-        {
-            return "Too large to show";
-        }
-
-        return System.Math.Round(value, SignificantDecimals).ToString(ResultFormat, CultureInfo.CurrentCulture);
-    }
+    private static string Format(decimal value) => value.ToString(ResultFormat, CultureInfo.CurrentCulture);
 }

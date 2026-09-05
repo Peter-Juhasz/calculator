@@ -49,7 +49,7 @@ public sealed class MathMlLinearizerTests
         var expression = MathMlLinearizer.Linearize(Document(
             "<mn>1</mn><mo>+</mo><mfrac><mn>1</mn><mn>2</mn></mfrac>"));
 
-        Assert.AreEqual(1.5, ExpressionEvaluator.Evaluate(expression), 1e-10);
+        Assert.AreEqual(1.5m, ExpressionEvaluator.Evaluate(expression));
     }
 
     [TestMethod]
@@ -83,7 +83,7 @@ public sealed class MathMlLinearizerTests
         var expression = MathMlLinearizer.Linearize(Document(
             "<mn>1</mn><mo>⁤</mo><mfrac><mn>1</mn><mn>2</mn></mfrac>"));
 
-        Assert.AreEqual(1.5, ExpressionEvaluator.Evaluate(expression), 1e-10);
+        Assert.AreEqual(1.5m, ExpressionEvaluator.Evaluate(expression));
     }
 
     [TestMethod]

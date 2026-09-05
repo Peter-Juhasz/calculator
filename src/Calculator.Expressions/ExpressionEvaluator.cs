@@ -7,6 +7,12 @@ namespace Calculator.Expressions;
 /// multiplication, division and parentheses, and nothing else: there are no functions and no
 /// names to look up.
 /// </summary>
+/// <remarks>
+/// Arithmetic is done in <see cref="decimal"/> rather than binary floating point, so the numbers
+/// people write are held as they wrote them: a tenth is a tenth, and 0.1 + 0.2 is exactly 0.3.
+/// The cost is a narrower range, which a decimal announces by overflowing rather than quietly
+/// drifting to infinity.
+/// </remarks>
 public static class ExpressionEvaluator
 {
     /// <summary>
@@ -14,7 +20,8 @@ public static class ExpressionEvaluator
     /// </summary>
     /// <exception cref="ExpressionFormatException">The expression could not be read.</exception>
     /// <exception cref="DivideByZeroException">The expression divides by zero.</exception>
-    public static double Evaluate(string expression)
+    /// <exception cref="OverflowException">The value is larger than a decimal can hold.</exception>
+    public static decimal Evaluate(string expression)
     {
         ArgumentNullException.ThrowIfNull(expression);
 
@@ -64,7 +71,7 @@ public static class ExpressionEvaluator
             }
         }
 
-        public double ReadExpression()
+        public decimal ReadExpression()
         {
             var value = ReadTerm();
 
@@ -85,7 +92,7 @@ public static class ExpressionEvaluator
             }
         }
 
-        private double ReadTerm()
+        private decimal ReadTerm()
         {
             var value = ReadSigned();
 
@@ -121,7 +128,7 @@ public static class ExpressionEvaluator
             }
         }
 
-        private double ReadSigned()
+        private decimal ReadSigned()
         {
             SkipWhitespace();
 
@@ -142,7 +149,7 @@ public static class ExpressionEvaluator
             return ReadValue();
         }
 
-        private double ReadValue()
+        private decimal ReadValue()
         {
             SkipWhitespace();
 
@@ -190,7 +197,7 @@ public static class ExpressionEvaluator
             throw NotHere(Current);
         }
 
-        private double ReadNumber()
+        private decimal ReadNumber()
         {
             var start = _position;
             var separators = 0;
@@ -209,15 +216,23 @@ public static class ExpressionEvaluator
             // the reader gives them. Parsing then happens against one fixed spelling of a number.
             var literal = _text[start.._position].ToString().Replace(',', '.');
 
-            if (!double.TryParse(literal, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
+            if (!decimal.TryParse(literal, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var value))
             {
+                // The scan above let through only digits and at most one separator, so anything
+                // that fails here is either a separator standing on its own or a number with more
+                // digits than a decimal can hold.
+                if (literal.Length > 1)
+                {
+                    throw new OverflowException("That number is too large.");
+                }
+
                 throw new ExpressionFormatException("'" + literal + "' is not a number.");
             }
 
             return value;
         }
 
-        private static double Divide(double left, double right) =>
+        private static decimal Divide(decimal left, decimal right) =>
             right == 0
                 ? throw new DivideByZeroException("Dividing by zero has no answer.")
                 : left / right;
