@@ -85,6 +85,147 @@ public sealed class ExpressionEvaluatorTests
     }
 
     [TestMethod]
+    public void Evaluate_APower_RaisesTheBaseToIt()
+    {
+        Assert.AreEqual(1024m, ExpressionEvaluator.Evaluate("2^10"));
+    }
+
+    [TestMethod]
+    public void Evaluate_PowersInARow_AreWorkedOutFromTheRight()
+    {
+        // 2^(3^2), not (2^3)^2, which would be 64.
+        Assert.AreEqual(512m, ExpressionEvaluator.Evaluate("2^3^2"));
+    }
+
+    [TestMethod]
+    public void Evaluate_APowerAndAMultiplication_RaisesFirst()
+    {
+        Assert.AreEqual(18m, ExpressionEvaluator.Evaluate("2*3^2"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AMinusBeforeAPower_NegatesTheResultOfThePower()
+    {
+        Assert.AreEqual(-4m, ExpressionEvaluator.Evaluate("-2^2"));
+    }
+
+    [TestMethod]
+    public void Evaluate_ANegativeExponent_IsTheReciprocal()
+    {
+        Assert.AreEqual(0.25m, ExpressionEvaluator.Evaluate("2^-2"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AnythingToThePowerOfZero_IsOne()
+    {
+        Assert.AreEqual(1m, ExpressionEvaluator.Evaluate("5^0"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AWholePowerOfADecimal_IsExact()
+    {
+        Assert.AreEqual(1.21m, ExpressionEvaluator.Evaluate("1.1^2"));
+    }
+
+    [TestMethod]
+    public void Evaluate_APowerOfAGroup_RaisesTheWholeGroup()
+    {
+        Assert.AreEqual(27m, ExpressionEvaluator.Evaluate("(1+2)^3"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AFractionalPower_IsWorkedOutApproximately()
+    {
+        Assert.AreEqual(3m, System.Math.Round(ExpressionEvaluator.Evaluate("9^0.5"), 10));
+    }
+
+    [TestMethod]
+    public void Evaluate_AFractionalPowerOfANegativeNumber_HasNoAnswer()
+    {
+        Assert.ThrowsExactly<ArithmeticException>(() => ExpressionEvaluator.Evaluate("(0-8)^0.5"));
+    }
+
+    [TestMethod]
+    public void Evaluate_ZeroToANegativePower_HasNoAnswer()
+    {
+        Assert.ThrowsExactly<DivideByZeroException>(() => ExpressionEvaluator.Evaluate("0^-1"));
+    }
+
+    [TestMethod]
+    public void Evaluate_APowerTooLargeToHold_Overflows()
+    {
+        Assert.ThrowsExactly<OverflowException>(() => ExpressionEvaluator.Evaluate("10^100"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AFactorial_MultipliesEveryWholeNumberUpToIt()
+    {
+        Assert.AreEqual(120m, ExpressionEvaluator.Evaluate("5!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_TheFactorialOfZero_IsOne()
+    {
+        Assert.AreEqual(1m, ExpressionEvaluator.Evaluate("0!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_TwoExclamationMarks_TakesTheFactorialTwice()
+    {
+        // (3!)! is 6!, which is 720.
+        Assert.AreEqual(720m, ExpressionEvaluator.Evaluate("3!!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AFactorialUnderAPower_IsTakenFirst()
+    {
+        Assert.AreEqual(36m, ExpressionEvaluator.Evaluate("3!^2"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AFactorialInAnExponent_IsTakenFirst()
+    {
+        Assert.AreEqual(64m, ExpressionEvaluator.Evaluate("2^3!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AFactorialOfAGroup_TakesTheWholeGroup()
+    {
+        Assert.AreEqual(24m, ExpressionEvaluator.Evaluate("(2+2)!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AMinusBeforeAFactorial_NegatesTheResult()
+    {
+        Assert.AreEqual(-6m, ExpressionEvaluator.Evaluate("-3!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_TheFactorialOfAFraction_HasNoAnswer()
+    {
+        Assert.ThrowsExactly<ArithmeticException>(() => ExpressionEvaluator.Evaluate("2.5!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_TheFactorialOfANegativeNumber_HasNoAnswer()
+    {
+        Assert.ThrowsExactly<ArithmeticException>(() => ExpressionEvaluator.Evaluate("(0-3)!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AFactorialTooLargeToHold_Overflows()
+    {
+        // A decimal runs out between 27! and 28!.
+        Assert.ThrowsExactly<OverflowException>(() => ExpressionEvaluator.Evaluate("28!"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AnExclamationMarkWithNothingBeforeIt_IsRejected()
+    {
+        Assert.ThrowsExactly<ExpressionFormatException>(() => ExpressionEvaluator.Evaluate("!5"));
+    }
+
+    [TestMethod]
     public void Evaluate_TenthsAddedTogether_ComeOutExactly()
     {
         // The whole reason for working in decimal: in binary floating point this lands a hair

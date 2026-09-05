@@ -116,10 +116,29 @@ public sealed class MathMlLinearizerTests
     }
 
     [TestMethod]
-    public void Linearize_ASuperscript_IsRejectedForNow()
+    public void Linearize_ASuperscript_BecomesAPower()
     {
-        Assert.ThrowsExactly<ExpressionFormatException>(
-            () => MathMlLinearizer.Linearize(Document("<msup><mn>4</mn><mn>2</mn></msup>")));
+        Assert.AreEqual(
+            "(4)^(2)",
+            MathMlLinearizer.Linearize(Document("<msup><mn>4</mn><mn>2</mn></msup>")));
+    }
+
+    [TestMethod]
+    public void Linearize_ASuperscriptOverASum_RaisesTheWholeSum()
+    {
+        // A raised position needs no brackets to say where the exponent ends; written flat, the
+        // parentheses have to say it.
+        var expression = MathMlLinearizer.Linearize(Document(
+            "<msup><mn>2</mn><mrow><mn>1</mn><mo>+</mo><mn>2</mn></mrow></msup>"));
+
+        Assert.AreEqual(8m, ExpressionEvaluator.Evaluate(expression));
+    }
+
+    [TestMethod]
+    public void Linearize_AnExclamationMark_IsAFactorial()
+    {
+        Assert.AreEqual(120m, ExpressionEvaluator.Evaluate(
+            MathMlLinearizer.Linearize(Document("<mn>5</mn><mo>!</mo>"))));
     }
 
     [TestMethod]

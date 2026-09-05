@@ -4,14 +4,15 @@ namespace Calculator.Expressions;
 
 /// <summary>
 /// Works out what an expression comes to. It understands numbers, addition, subtraction,
-/// multiplication, division and parentheses, and nothing else: there are no functions and no
-/// names to look up.
+/// multiplication, division, powers, factorials and parentheses, and nothing else: there are no
+/// functions and no names to look up.
 /// </summary>
 /// <remarks>
 /// Arithmetic is done in <see cref="decimal"/> rather than binary floating point, so the numbers
 /// people write are held as they wrote them: a tenth is a tenth, and 0.1 + 0.2 is exactly 0.3.
 /// The cost is a narrower range, which a decimal announces by overflowing rather than quietly
-/// drifting to infinity.
+/// drifting to infinity. The single exception is a power that is not whole, which the framework
+/// has no decimal arithmetic for and which is therefore approximated.
 /// </remarks>
 public static class ExpressionEvaluator
 {
@@ -21,6 +22,9 @@ public static class ExpressionEvaluator
     /// <exception cref="ExpressionFormatException">The expression could not be read.</exception>
     /// <exception cref="DivideByZeroException">The expression divides by zero.</exception>
     /// <exception cref="OverflowException">The value is larger than a decimal can hold.</exception>
+    /// <exception cref="ArithmeticException">
+    /// The expression asks for something with no answer, such as a factorial of a fraction.
+    /// </exception>
     public static decimal Evaluate(string expression)
     {
         ArgumentNullException.ThrowIfNull(expression);
@@ -146,7 +150,58 @@ public static class ExpressionEvaluator
                 return sign == '-' ? -operand : operand;
             }
 
-            return ReadValue();
+            return ReadPower();
+        }
+
+        /// <summary>
+        /// Reads a value and, if one follows, the power it is raised to. The exponent is read
+        /// back through <see cref="ReadSigned"/>, which makes powers right-associative and lets
+        /// the exponent carry a sign: 2^3^2 is 2^(3^2), and 2^-1 is a half.
+        /// </summary>
+        private decimal ReadPower()
+        {
+            var value = ReadFactorial();
+
+            SkipWhitespace();
+
+            if (IsAtEnd || Current != '^')
+            {
+                return value;
+            }
+
+            _position++;
+            var raised = Power(value, ReadSigned());
+
+            // Whatever the base was, what comes back is a number rather than a group, so nothing
+            // written after it is a product with it.
+            _lastWasGroup = false;
+            return raised;
+        }
+
+        /// <summary>
+        /// Reads a value and any exclamation marks after it. Being read below powers is what
+        /// makes 3!^2 the square of six, and 2^3! two raised to six.
+        /// </summary>
+        private decimal ReadFactorial()
+        {
+            var value = ReadValue();
+
+            while (true)
+            {
+                SkipWhitespace();
+
+                if (IsAtEnd || Current != '!')
+                {
+                    return value;
+                }
+
+                _position++;
+                value = Factorial(value);
+
+                // What comes back is a number rather than a group, so nothing written after it
+                // is a product with it.
+                _lastWasGroup = false;
+            }
         }
 
         private decimal ReadValue()
@@ -236,6 +291,89 @@ public static class ExpressionEvaluator
             right == 0
                 ? throw new DivideByZeroException("Dividing by zero has no answer.")
                 : left / right;
+
+        private static decimal Power(decimal value, decimal exponent)
+        {
+            // A whole power is repeated multiplication, and repeated multiplication of decimals
+            // is exact. This is the case nearly every typed power falls into.
+            if (decimal.IsInteger(exponent) && System.Math.Abs(exponent) <= long.MaxValue)
+            {
+                var magnitude = WholePower(value, (long)System.Math.Abs(exponent));
+
+                if (exponent >= 0)
+                {
+                    return magnitude;
+                }
+
+                return magnitude == 0
+                    ? throw new DivideByZeroException("Zero to a negative power has no answer.")
+                    : 1m / magnitude;
+            }
+
+            // A power that is not whole has no decimal arithmetic behind it in the framework, so
+            // it is worked out in binary floating point and brought back. This is the one place
+            // in here where an answer is an approximation rather than exact.
+            var approximation = System.Math.Pow((double)value, (double)exponent);
+
+            if (double.IsNaN(approximation))
+            {
+                throw new ArithmeticException("A negative number has no such power.");
+            }
+
+            // Converting either infinity to a decimal reports itself as an overflow anyway, but
+            // says so here rather than several frames away.
+            if (double.IsInfinity(approximation))
+            {
+                throw new OverflowException("The result is too large.");
+            }
+
+            return (decimal)approximation;
+        }
+
+        /// <summary>
+        /// Raises <paramref name="value"/> to a whole, non-negative power, squaring as it goes so
+        /// that a large power costs a handful of multiplications rather than one per step.
+        /// </summary>
+        private static decimal WholePower(decimal value, long exponent)
+        {
+            var result = 1m;
+
+            while (exponent > 0)
+            {
+                if ((exponent & 1) == 1)
+                {
+                    result *= value;
+                }
+
+                exponent >>= 1;
+
+                if (exponent > 0)
+                {
+                    value *= value;
+                }
+            }
+
+            return result;
+        }
+
+        private static decimal Factorial(decimal value)
+        {
+            if (!decimal.IsInteger(value) || value < 0)
+            {
+                throw new ArithmeticException("Only a whole number that is not negative has a factorial.");
+            }
+
+            var result = 1m;
+
+            // A decimal runs out at 28!, so the loop is short whatever it is handed: an oversized
+            // count overflows long before it comes anywhere near the end.
+            for (var factor = 2m; factor <= value; factor++)
+            {
+                result *= factor;
+            }
+
+            return result;
+        }
 
         private static bool IsDecimalSeparator(char character) => character is '.' or ',';
     }

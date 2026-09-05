@@ -115,6 +115,10 @@ public sealed partial class MainWindow : Window
         {
             ShowMessage("The result is too large to work out.", isHint: false);
         }
+        catch (ArithmeticException exception)
+        {
+            ShowMessage(exception.Message, isHint: false);
+        }
     }
 
     private void ShowNothing()

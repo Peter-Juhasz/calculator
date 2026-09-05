@@ -89,7 +89,11 @@ public static class MathMlLinearizer
                 break;
 
             case "mfrac":
-                WriteFraction(element, builder);
+                WritePair(element, builder, "(", ")/(", ")");
+                break;
+
+            case "msup":
+                WritePair(element, builder, "(", ")^(", ")");
                 break;
 
             case "mfenced":
@@ -111,7 +115,7 @@ public static class MathMlLinearizer
 
             default:
                 throw new ExpressionFormatException(
-                    "Only addition, subtraction, multiplication, division and parentheses are supported so far.");
+                    "Only the four operations, powers, factorials and parentheses are supported so far.");
         }
     }
 
@@ -123,22 +127,29 @@ public static class MathMlLinearizer
         }
     }
 
-    private static void WriteFraction(XElement element, StringBuilder builder)
+    /// <summary>
+    /// Writes the two parts of something built up on the screen — the halves of a fraction, a
+    /// base and its exponent — onto one line.
+    /// </summary>
+    /// <remarks>
+    /// Both parts are parenthesised on the way down. What is stacked needs no brackets to say
+    /// where it begins and ends, so a fraction bar groups everything above and below it and a
+    /// raised position groups the whole exponent; written flat, only parentheses can say that.
+    /// </remarks>
+    private static void WritePair(XElement element, StringBuilder builder, string open, string between, string close)
     {
         var parts = element.Elements().ToArray();
 
         if (parts.Length != 2)
         {
-            throw new ExpressionFormatException("The fraction could not be read.");
+            throw new ExpressionFormatException("That could not be read.");
         }
 
-        // The halves are parenthesised on the way down: a fraction bar groups everything above
-        // and below it, which a plain slash on one line does not.
-        builder.Append('(');
+        builder.Append(open);
         Write(parts[0], builder);
-        builder.Append(")/(");
+        builder.Append(between);
         Write(parts[1], builder);
-        builder.Append(')');
+        builder.Append(close);
     }
 
     /// <summary>
