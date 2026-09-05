@@ -1,0 +1,211 @@
+using System.Text;
+using System.Xml;
+using System.Xml.Linq;
+
+namespace Calculator.Expressions;
+
+/// <summary>
+/// Turns the MathML that a math-mode rich edit box hands back into the one line of text the
+/// evaluator reads.
+/// </summary>
+/// <remarks>
+/// Two things happen here. Built-up notation is flattened, so a fraction stacked on the screen
+/// becomes a division of two parenthesised halves. And the many characters that all mean the
+/// same operation — the several multiplication dots, the minus sign that is not a hyphen, the
+/// spaces that only group digits — are each reduced to the single spelling the evaluator knows.
+/// </remarks>
+public static class MathMlLinearizer
+{
+    /// <summary>
+    /// Reads <paramref name="mathML"/> and returns the expression it holds, or an empty string
+    /// if it holds nothing.
+    /// </summary>
+    /// <exception cref="ExpressionFormatException">
+    /// The markup is not readable, or uses notation that is not supported.
+    /// </exception>
+    public static string Linearize(string mathML)
+    {
+        ArgumentNullException.ThrowIfNull(mathML);
+
+        // The rich edit box pads what it hands back with a byte order mark and a terminator.
+        var markup = mathML.Trim('\uFEFF', '\0').Trim();
+
+        if (markup.Length == 0)
+        {
+            return string.Empty;
+        }
+
+        XElement? root;
+
+        try
+        {
+            root = XDocument.Parse(markup).Root;
+        }
+        catch (XmlException exception)
+        {
+            throw new ExpressionFormatException("The expression could not be read.", exception);
+        }
+
+        if (root is null)
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder();
+        Write(root, builder);
+        return builder.ToString();
+    }
+
+    private static void Write(XElement element, StringBuilder builder)
+    {
+        switch (element.Name.LocalName)
+        {
+            case "math":
+            case "mrow":
+            case "mstyle":
+            case "mpadded":
+                WriteChildren(element, builder);
+                break;
+
+            // Presentation markup first, then an annotation saying the same thing another way.
+            // Only the first of the two is the expression.
+            case "semantics":
+                var presentation = element.Elements().FirstOrDefault();
+                if (presentation is not null)
+                {
+                    Write(presentation, builder);
+                }
+
+                break;
+
+            case "mn":
+            case "mo":
+            case "mtext":
+            case "ms":
+                builder.Append(Normalize(element.Value));
+                break;
+
+            case "mspace":
+                break;
+
+            case "mfrac":
+                WriteFraction(element, builder);
+                break;
+
+            case "mfenced":
+                builder.Append('(');
+                WriteChildren(element, builder);
+                builder.Append(')');
+                break;
+
+            // A letter is either a name, which there is nothing yet to look up, or the empty box
+            // standing in for a part not filled in, which normalising away leaves nothing at all.
+            case "mi":
+                var identifier = Normalize(element.Value);
+                if (identifier.Length > 0)
+                {
+                    throw new ExpressionFormatException("Names and functions are not supported yet.");
+                }
+
+                break;
+
+            default:
+                throw new ExpressionFormatException(
+                    "Only addition, subtraction, multiplication, division and parentheses are supported so far.");
+        }
+    }
+
+    private static void WriteChildren(XElement element, StringBuilder builder)
+    {
+        foreach (var child in element.Elements())
+        {
+            Write(child, builder);
+        }
+    }
+
+    private static void WriteFraction(XElement element, StringBuilder builder)
+    {
+        var parts = element.Elements().ToArray();
+
+        if (parts.Length != 2)
+        {
+            throw new ExpressionFormatException("The fraction could not be read.");
+        }
+
+        // The halves are parenthesised on the way down: a fraction bar groups everything above
+        // and below it, which a plain slash on one line does not.
+        builder.Append('(');
+        Write(parts[0], builder);
+        builder.Append(")/(");
+        Write(parts[1], builder);
+        builder.Append(')');
+    }
+
+    /// <summary>
+    /// Reduces the several spellings of each operation to the one the evaluator reads, and drops
+    /// the characters that are there only for typesetting.
+    /// </summary>
+    private static string Normalize(string text)
+    {
+        var builder = new StringBuilder(text.Length);
+
+        foreach (var character in text)
+        {
+            switch (character)
+            {
+                case '\u2212': // minus sign
+                case '\u2013': // en dash
+                    builder.Append('-');
+                    break;
+
+                case '\u00D7': // multiplication sign
+                case '\u22C5': // dot operator
+                case '\u2217': // asterisk operator
+                case '\u00B7': // middle dot
+                case '\u2062': // invisible times
+                    builder.Append('*');
+                    break;
+
+                case '\u00F7': // division sign
+                case '\u2215': // division slash
+                case '\u2044': // fraction slash
+                case '\u2236': // ratio
+                    builder.Append('/');
+                    break;
+
+                // Invisible plus is what joins the two halves of a mixed number such as 1 1/2.
+                case '\u2064':
+                    builder.Append('+');
+                    break;
+
+                case '[':
+                case '{':
+                    builder.Append('(');
+                    break;
+
+                case ']':
+                case '}':
+                    builder.Append(')');
+                    break;
+
+                case '\u2061': // function application
+                case '\u2063': // invisible separator
+                case '\u200B': // zero width space
+                case '\uFEFF': // zero width no-break space
+                case '\u00A0': // no-break space, which groups digits rather than separating them
+                case '\u2007': // figure space, likewise
+                case '\u2009': // thin space, likewise
+                case '\u202F': // narrow no-break space, likewise
+                case '\u2B1A': // dotted square, the box shown for a part not filled in yet
+                case '\u25A1': // white square, likewise
+                    break;
+
+                default:
+                    builder.Append(character);
+                    break;
+            }
+        }
+
+        return builder.ToString();
+    }
+}

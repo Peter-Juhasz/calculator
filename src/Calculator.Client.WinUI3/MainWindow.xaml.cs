@@ -1,0 +1,161 @@
+using System.Globalization;
+using Calculator.Expressions;
+using Microsoft.UI.Composition.SystemBackdrops;
+using Microsoft.UI.Text;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Windows.Graphics;
+using Windows.System;
+
+namespace Calculator.Client.WinUI3;
+
+public sealed partial class MainWindow : Window
+{
+    /// <summary>
+    /// The window opens wide rather than tall, and no bigger than the two lines it holds. An
+    /// expression and its result each read along a line, and there is nothing else to stack
+    /// underneath them.
+    /// </summary>
+    private static readonly SizeInt32 InitialSize = new(720, 380);
+
+    /// <summary>
+    /// Up to twelve decimals are shown, grouped for reading. Trailing zeros are dropped, so a
+    /// whole number reads as one.
+    /// </summary>
+    private const string ResultFormat = "#,##0.############";
+
+    /// <summary>
+    /// Where binary floating point stops being able to hold a decimal exactly. Rounding here
+    /// keeps 0.1 + 0.2 reading as 0.3 without touching any digit the reader typed.
+    /// </summary>
+    private const int SignificantDecimals = 12;
+
+    public MainWindow()
+    {
+        InitializeComponent();
+        ConfigureWindowChrome();
+
+        // Setting the math mode empties the box, so it happens before anything is in it. From
+        // here on the box takes UnicodeMath — 1/2 builds a fraction, and so on.
+        InputBox.TextDocument.SetMathMode(RichEditMathMode.MathOnly);
+
+        ShowNothing();
+    }
+
+    private void ConfigureWindowChrome()
+    {
+        Title = "Calculator";
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(AppTitleBar);
+
+        if (DesktopAcrylicController.IsSupported())
+        {
+            SystemBackdrop = new DesktopAcrylicBackdrop();
+        }
+
+        AppWindow.Resize(InitialSize);
+        CenterOnDisplay();
+    }
+
+    private void CenterOnDisplay()
+    {
+        var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
+
+        AppWindow.Move(new PointInt32(
+            workArea.X + ((workArea.Width - AppWindow.Size.Width) / 2),
+            workArea.Y + ((workArea.Height - AppWindow.Size.Height) / 2)));
+    }
+
+    /// <summary>
+    /// The box is the only thing here to type into, so it starts out holding the caret and the
+    /// window can be typed into the moment it opens.
+    /// </summary>
+    private void RootGridLoaded(object sender, RoutedEventArgs e) => InputBox.Focus(FocusState.Programmatic);
+
+    private void InputBoxTextChanged(object sender, RoutedEventArgs e) => UpdateResult();
+
+    /// <summary>
+    /// A rich edit box would take Enter as a new line. An expression is one line, and its result
+    /// is already on screen without having to be asked for.
+    /// </summary>
+    private void InputBoxPreviewKeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Enter)
+        {
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>
+    /// Reads the box and works out what it comes to. Called on every keystroke, which is what
+    /// makes the result follow the expression rather than wait for it.
+    /// </summary>
+    private void UpdateResult()
+    {
+        InputBox.TextDocument.GetMathML(out var mathML);
+
+        try
+        {
+            var expression = MathMlLinearizer.Linearize(mathML);
+
+            if (string.IsNullOrWhiteSpace(expression))
+            {
+                ShowNothing();
+                return;
+            }
+
+            ShowValue(ExpressionEvaluator.Evaluate(expression));
+        }
+        catch (ExpressionFormatException exception)
+        {
+            ShowMessage(exception.Message, isHint: exception.IsIncomplete);
+        }
+        catch (DivideByZeroException exception)
+        {
+            ShowMessage(exception.Message, isHint: false);
+        }
+    }
+
+    private void ShowNothing()
+    {
+        ResultText.Visibility = Visibility.Collapsed;
+        MessageText.Visibility = Visibility.Collapsed;
+    }
+
+    private void ShowValue(double value)
+    {
+        ResultText.Text = Format(value);
+        ResultText.Visibility = Visibility.Visible;
+        MessageText.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Shows what stands in the way of a result. An expression that is merely unfinished is said
+    /// quietly, because that is what every expression looks like while it is being typed; a
+    /// genuine mistake is said in the colour reserved for one.
+    /// </summary>
+    private void ShowMessage(string message, bool isHint)
+    {
+        ResultText.Visibility = Visibility.Collapsed;
+        MessageText.Text = message;
+        MessageText.Foreground = (Brush)RootGrid.Resources[isHint ? "MessageHintBrush" : "MessageErrorBrush"];
+        MessageText.Visibility = Visibility.Visible;
+    }
+
+    private static string Format(double value)
+    {
+        if (double.IsNaN(value))
+        {
+            return "Undefined";
+        }
+
+        if (double.IsInfinity(value))
+        {
+            return "Too large to show";
+        }
+
+        return System.Math.Round(value, SignificantDecimals).ToString(ResultFormat, CultureInfo.CurrentCulture);
+    }
+}

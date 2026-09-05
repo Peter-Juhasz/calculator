@@ -1,0 +1,89 @@
+<Window
+    x:Class="Calculator.Client.WinUI3.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    Title="Calculator">
+
+    <!-- The window itself is the split: what was typed in the upper half, what it comes to in
+         the lower. Both halves reach the window's edges, and the title bar lies over the top of
+         the input rather than taking a band of its own. -->
+    <Grid x:Name="RootGrid" Loaded="RootGridLoaded">
+        <Grid.Resources>
+            <!-- What a rich edit box switches to in math mode. Naming it here lets the result be
+                 set in the same face as the expression it came from. -->
+            <FontFamily x:Key="MathFontFamily">Cambria Math</FontFamily>
+
+            <SolidColorBrush x:Key="MessageHintBrush" Color="{ThemeResource TextFillColorTertiary}" />
+            <SolidColorBrush x:Key="MessageErrorBrush" Color="{ThemeResource SystemFillColorCritical}" />
+        </Grid.Resources>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="80" />
+        </Grid.RowDefinitions>
+
+        <!-- The top padding is what the title bar sits in, so the first line of an expression
+             starts below it rather than behind it. -->
+        <RichEditBox
+            x:Name="InputBox"
+            Grid.Row="0"
+            HorizontalAlignment="Stretch"
+            VerticalAlignment="Stretch"
+            Padding="16,56,16,16"
+            BorderThickness="0,0,0,1"
+            CornerRadius="0"
+            FontSize="28"
+            IsSpellCheckEnabled="False"
+            PlaceholderText="Type here"
+            PreviewKeyDown="InputBoxPreviewKeyDown"
+            TextChanged="InputBoxTextChanged"
+            TextWrapping="Wrap" />
+
+        <Grid
+            Grid.Row="1"
+            Margin="16"
+            ColumnSpacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock
+                Grid.Column="0"
+                VerticalAlignment="Center"
+                FontFamily="{StaticResource MathFontFamily}"
+                FontSize="32"
+                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                Text="=" />
+
+            <!-- Only ever one of the two is shown, so they share a cell and each centres
+                 itself against the equals sign rather than stacking away from it. -->
+            <Grid Grid.Column="1">
+                <TextBlock
+                    x:Name="ResultText"
+                    VerticalAlignment="Center"
+                    FontFamily="{StaticResource MathFontFamily}"
+                    FontSize="32"
+                    IsTextSelectionEnabled="True"
+                    TextWrapping="Wrap" />
+                <TextBlock
+                    x:Name="MessageText"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
+            </Grid>
+        </Grid>
+
+        <!-- Declared last so it lies over the input box it shares a row with. Its background is
+             left transparent so the box reads as one unbroken surface underneath. -->
+        <muxc:TitleBar
+            x:Name="AppTitleBar"
+            Grid.Row="0"
+            Height="48"
+            VerticalAlignment="Top"
+            Title="Calculator"
+            Background="Transparent" />
+    </Grid>
+</Window>

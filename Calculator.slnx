@@ -1,0 +1,16 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="ARM64" />
+  </Configurations>
+  <Folder Name="/src/">
+    <Project Path="src/Calculator.Client.WinUI3/Calculator.Client.WinUI3.csproj">
+      <Platform Solution="*|ARM64" Project="ARM64" />
+      <Platform Solution="*|x64" Project="x64" />
+    </Project>
+    <Project Path="src/Calculator.Expressions/Calculator.Expressions.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Calculator.Expressions.Tests/Calculator.Expressions.Tests.csproj" />
+  </Folder>
+</Solution>
