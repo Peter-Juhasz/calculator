@@ -340,4 +340,51 @@ public sealed class ExpressionEvaluatorTests
 
         Assert.IsTrue(exception.IsIncomplete);
     }
+
+    [TestMethod]
+    public void Evaluate_WithNoTypeNamed_WorksInDecimal()
+    {
+        Assert.AreEqual(typeof(decimal), ExpressionEvaluator.Evaluate("1").GetType());
+    }
+
+    [TestMethod]
+    public void Evaluate_InDouble_ReadsTheSameExpressionTheSameWay()
+    {
+        Assert.AreEqual(20d, ExpressionEvaluator.Evaluate<double>("(2+3)*4"));
+    }
+
+    [TestMethod]
+    public void Evaluate_InDouble_CarriesTheMissThatBinaryFloatingPointMakes()
+    {
+        // The counterpart of the decimal test above: naming double is asking for its arithmetic,
+        // misses and all.
+        Assert.AreNotEqual(0.3d, ExpressionEvaluator.Evaluate<double>("0.1+0.2"));
+    }
+
+    [TestMethod]
+    public void Evaluate_InAWholeNumberType_DividesTheWayThatTypeDivides()
+    {
+        Assert.AreEqual(2, ExpressionEvaluator.Evaluate<int>("10/4"));
+    }
+
+    [TestMethod]
+    public void Evaluate_InAWholeNumberType_RejectsANumberWithAFraction()
+    {
+        Assert.ThrowsExactly<OverflowException>(() => ExpressionEvaluator.Evaluate<int>("1.5"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AResultBiggerThanTheNamedTypeHolds_Overflows()
+    {
+        // Checked arithmetic is what turns a whole number type's silent wraparound into an answer
+        // the reader is told about.
+        Assert.ThrowsExactly<OverflowException>(() => ExpressionEvaluator.Evaluate<int>("2000000000+2000000000"));
+    }
+
+    [TestMethod]
+    public void Evaluate_AFactorialBiggerThanTheNamedTypeHolds_Overflows()
+    {
+        // A double answers with infinity rather than overflowing, so the loop has to stop itself.
+        Assert.ThrowsExactly<OverflowException>(() => ExpressionEvaluator.Evaluate<double>("2000!"));
+    }
 }
