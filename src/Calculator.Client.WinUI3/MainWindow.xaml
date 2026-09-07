@@ -28,11 +28,25 @@
                 <Setter Property="HorizontalAlignment" Value="Center" />
                 <Setter Property="VerticalAlignment" Value="Center" />
             </Style>
+
+            <!-- The same trick again, for a choice that is made once and then left alone. At rest
+                 it is a caption in the colour captions take, no wider than the word in it; the
+                 fill, the outline and the ordinary text colour arrive only when it is pointed at.
+                 -->
+            <Style x:Key="StealthComboBoxStyle" TargetType="ComboBox" BasedOn="{StaticResource DefaultComboBoxStyle}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderBrush" Value="Transparent" />
+                <Setter Property="Foreground" Value="{ThemeResource TextFillColorTertiaryBrush}" />
+                <Setter Property="FontSize" Value="12" />
+                <Setter Property="MinWidth" Value="0" />
+                <Setter Property="MinHeight" Value="28" />
+                <Setter Property="Padding" Value="8,2,8,3" />
+            </Style>
         </Grid.Resources>
 
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
-            <RowDefinition Height="80" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
         <!-- The top padding is what the title bar sits in, so the first line of an expression
@@ -52,57 +66,81 @@
             TextChanged="InputBoxTextChanged"
             TextWrapping="Wrap" />
 
-        <Grid
-            Grid.Row="1"
-            Margin="16"
-            ColumnSpacing="12">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
+        <!-- The lower half: which arithmetic to work in above, and what it comes to below. -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-            <TextBlock
-                Grid.Column="0"
-                VerticalAlignment="Center"
-                FontFamily="{StaticResource MathFontFamily}"
-                FontSize="32"
-                Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                Text="=" />
+            <!-- Which number type the answer is worked out in. It sits over the result rather
+                 than beside it, because it says how to read the line underneath. Its own padding
+                 makes up the rest of the margin, so the word inside it starts directly above the
+                 equals sign. -->
+            <ComboBox
+                x:Name="EvaluatorSelector"
+                Grid.Row="0"
+                Margin="8,10,0,0"
+                HorizontalAlignment="Left"
+                Style="{StaticResource StealthComboBoxStyle}"
+                DisplayMemberPath="DisplayName"
+                SelectionChanged="EvaluatorSelectorSelectionChanged"
+                AutomationProperties.Name="Arithmetic"
+                ToolTipService.ToolTip="Which arithmetic the result is worked out in" />
 
-            <!-- Only ever one of the two is shown, so they share a cell and each centres
-                 itself against the equals sign rather than stacking away from it. -->
-            <Grid Grid.Column="1">
+            <Grid
+                Grid.Row="1"
+                Height="48"
+                Margin="16"
+                ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
                 <TextBlock
-                    x:Name="ResultText"
+                    Grid.Column="0"
                     VerticalAlignment="Center"
                     FontFamily="{StaticResource MathFontFamily}"
                     FontSize="32"
-                    IsTextSelectionEnabled="True"
-                    TextWrapping="Wrap" />
-                <TextBlock
-                    x:Name="MessageText"
-                    VerticalAlignment="Center"
-                    Style="{StaticResource BodyTextBlockStyle}"
-                    TextWrapping="Wrap"
-                    Visibility="Collapsed" />
-            </Grid>
+                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                    Text="=" />
 
-            <!-- Shown only once there is a value on the line to copy — not while the box is
-                 empty, and not over a message, which has nothing to put on the clipboard. -->
-            <Button
-                x:Name="CopyResultButton"
-                Grid.Column="2"
-                Click="CopyResultButtonClick"
-                Style="{StaticResource StealthIconButtonStyle}"
-                Visibility="Collapsed"
-                AutomationProperties.Name="Copy result"
-                ToolTipService.ToolTip="Copy result">
-                <FontIcon
-                    FontFamily="{ThemeResource SymbolThemeFontFamily}"
-                    FontSize="16"
-                    Glyph="&#xE8C8;" />
-            </Button>
+                <!-- Only ever one of the two is shown, so they share a cell and each centres
+                     itself against the equals sign rather than stacking away from it. -->
+                <Grid Grid.Column="1">
+                    <TextBlock
+                        x:Name="ResultText"
+                        VerticalAlignment="Center"
+                        FontFamily="{StaticResource MathFontFamily}"
+                        FontSize="32"
+                        IsTextSelectionEnabled="True"
+                        TextWrapping="Wrap" />
+                    <TextBlock
+                        x:Name="MessageText"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource BodyTextBlockStyle}"
+                        TextWrapping="Wrap"
+                        Visibility="Collapsed" />
+                </Grid>
+
+                <!-- Shown only once there is a value on the line to copy — not while the box is
+                     empty, and not over a message, which has nothing to put on the clipboard. -->
+                <Button
+                    x:Name="CopyResultButton"
+                    Grid.Column="2"
+                    Click="CopyResultButtonClick"
+                    Style="{StaticResource StealthIconButtonStyle}"
+                    Visibility="Collapsed"
+                    AutomationProperties.Name="Copy result"
+                    ToolTipService.ToolTip="Copy result">
+                    <FontIcon
+                        FontFamily="{ThemeResource SymbolThemeFontFamily}"
+                        FontSize="16"
+                        Glyph="&#xE8C8;" />
+                </Button>
+            </Grid>
         </Grid>
 
         <!-- Declared last so it lies over the input box it shares a row with. Its background is

@@ -1,9 +1,9 @@
-using System.Globalization;
 using Calculator.Expressions;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Text;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.ApplicationModel.DataTransfer;
@@ -15,23 +15,35 @@ namespace Calculator.Client.WinUI3;
 public sealed partial class MainWindow : Window
 {
     /// <summary>
-    /// The window opens wide rather than tall, and no bigger than the two lines it holds. An
-    /// expression and its result each read along a line, and there is nothing else to stack
-    /// underneath them.
+    /// The window opens wide rather than tall, and no bigger than what it holds. An expression
+    /// and its result each read along a line, and above the result there is only the one control
+    /// saying which arithmetic it was worked out in.
     /// </summary>
-    private static readonly SizeInt32 InitialSize = new(720, 380);
+    private static readonly SizeInt32 InitialSize = new(720, 430);
 
     /// <summary>
-    /// Up to twelve decimals are shown, grouped for reading. Trailing zeros are dropped, so a
-    /// whole number reads as one. A division that does not come out even carries far more digits
-    /// than that, and is rounded to fit rather than run off the line.
+    /// The ways of working an expression out that are offered to the reader, in the order they
+    /// are offered. The first is what the window starts on, so it is the one most expressions
+    /// want.
     /// </summary>
-    private const string ResultFormat = "#,##0.############";
+    private static readonly IExpressionEvaluator[] Evaluators =
+    [
+        new DecimalExpressionEvaluator(),
+        new BigIntegerExpressionEvaluator(),
+    ];
+
+    /// <summary>
+    /// Cancels the reading that is currently under way. Every keystroke supersedes the one before
+    /// it, so an answer that is still being worked out when the expression changes is no longer
+    /// wanted.
+    /// </summary>
+    private CancellationTokenSource _evaluation = new();
 
     public MainWindow()
     {
         InitializeComponent();
         ConfigureWindowChrome();
+        ConfigureEvaluators();
 
         // Setting the math mode empties the box, so it happens before anything is in it. From
         // here on the box takes UnicodeMath — 1/2 builds a fraction, and so on.
@@ -55,6 +67,16 @@ public sealed partial class MainWindow : Window
         CenterOnDisplay();
     }
 
+    /// <summary>
+    /// Fills the selector and settles on the first of the evaluators, so the window always has
+    /// one in hand before there is anything to work out.
+    /// </summary>
+    private void ConfigureEvaluators()
+    {
+        EvaluatorSelector.ItemsSource = Evaluators;
+        EvaluatorSelector.SelectedIndex = 0;
+    }
+
     private void CenterOnDisplay()
     {
         var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
@@ -70,7 +92,14 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void RootGridLoaded(object sender, RoutedEventArgs e) => InputBox.Focus(FocusState.Programmatic);
 
-    private void InputBoxTextChanged(object sender, RoutedEventArgs e) => UpdateResult();
+    private async void InputBoxTextChanged(object sender, RoutedEventArgs e) => await UpdateResultAsync();
+
+    /// <summary>
+    /// The expression stands as it was typed; only the arithmetic behind it has changed. Working
+    /// it out again is what makes the choice mean anything.
+    /// </summary>
+    private async void EvaluatorSelectorSelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        await UpdateResultAsync();
 
     /// <summary>
     /// A rich edit box would take Enter as a new line. An expression is one line, and its result
@@ -86,23 +115,31 @@ public sealed partial class MainWindow : Window
 
     /// <summary>
     /// Reads the box and works out what it comes to. Called on every keystroke, which is what
-    /// makes the result follow the expression rather than wait for it.
+    /// makes the result follow the expression rather than wait for it, and again whenever the
+    /// arithmetic behind it is changed.
     /// </summary>
-    private void UpdateResult()
+    private async Task UpdateResultAsync()
     {
+        var cancellationToken = SupersedeEvaluation();
+
         InputBox.TextDocument.GetMathML(out var mathML);
 
         try
         {
             var expression = MathMlLinearizer.Linearize(mathML);
 
-            if (string.IsNullOrWhiteSpace(expression))
+            if (string.IsNullOrWhiteSpace(expression) || EvaluatorSelector.SelectedItem is not IExpressionEvaluator evaluator)
             {
                 ShowNothing();
                 return;
             }
 
-            ShowValue(ExpressionEvaluator.Evaluate(expression));
+            ShowValue(await evaluator.EvaluateAsync(expression, cancellationToken));
+        }
+        catch (OperationCanceledException)
+        {
+            // The expression moved on while this reading was under way. Whatever superseded it is
+            // already on its way to the line, so nothing is shown for this one.
         }
         catch (ExpressionFormatException exception)
         {
@@ -122,6 +159,21 @@ public sealed partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Calls off the reading that is under way, if there is one, and hands back the token that
+    /// stands for the reading taking its place.
+    /// </summary>
+    private CancellationToken SupersedeEvaluation()
+    {
+        var superseded = _evaluation;
+        _evaluation = new CancellationTokenSource();
+
+        superseded.Cancel();
+        superseded.Dispose();
+
+        return _evaluation.Token;
+    }
+
     private void ShowNothing()
     {
         ResultText.Visibility = Visibility.Collapsed;
@@ -129,9 +181,9 @@ public sealed partial class MainWindow : Window
         CopyResultButton.Visibility = Visibility.Collapsed;
     }
 
-    private void ShowValue(decimal value)
+    private void ShowValue(string value)
     {
-        ResultText.Text = Format(value);
+        ResultText.Text = value;
         ResultText.Visibility = Visibility.Visible;
         MessageText.Visibility = Visibility.Collapsed;
         CopyResultButton.Visibility = Visibility.Visible;
@@ -162,6 +214,4 @@ public sealed partial class MainWindow : Window
         content.SetText(ResultText.Text);
         Clipboard.SetContent(content);
     }
-
-    private static string Format(decimal value) => value.ToString(ResultFormat, CultureInfo.CurrentCulture);
 }
