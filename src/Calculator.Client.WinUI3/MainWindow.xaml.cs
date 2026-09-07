@@ -157,8 +157,39 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void InputBoxTextChanged(object sender, RoutedEventArgs e)
     {
+        ReplaceAsteriskWithMultiplicationSign();
+
         InputBox.TextDocument.GetMathML(out var mathML);
         _expressions.OnNext(mathML);
+    }
+
+    /// <summary>
+    /// The asterisk key is how multiplication is reached for on a keyboard, but math mode takes it
+    /// for the asterisk operator, which is not how anyone writes multiplication down. What was
+    /// meant is put on the screen instead, as soon as the key lands.
+    /// </summary>
+    /// <remarks>
+    /// The keystroke is let through and mended afterwards rather than turned away: nothing in
+    /// WinUI can refuse a character before the box has taken it — a key can be swallowed, but only
+    /// by the key it is on, which is not the same key on every keyboard. Reading the character math
+    /// mode settled on rather than the key that produced it leaves the layout out of it entirely.
+    /// </remarks>
+    private void ReplaceAsteriskWithMultiplicationSign()
+    {
+        var selection = InputBox.TextDocument.Selection;
+
+        if (selection.StartPosition != selection.EndPosition || selection.StartPosition == 0)
+        {
+            return;
+        }
+
+        var typed = InputBox.TextDocument.GetRange(selection.StartPosition - 1, selection.StartPosition);
+
+        if (typed.Text == "∗")
+        {
+            typed.Text = "×";
+            selection.SetRange(typed.EndPosition, typed.EndPosition);
+        }
     }
 
     /// <summary>
