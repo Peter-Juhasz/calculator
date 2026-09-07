@@ -69,9 +69,10 @@ public sealed class WolframAlphaFullResultsClient
     /// Builds the address of one query.
     /// </summary>
     /// <remarks>
-    /// Asking for plaintext alone is asking for the whole of what is read back here. The service
-    /// otherwise renders every pod as an image and sends the addresses of them all, which is work
-    /// done and bytes sent for a picture nothing will ever fetch.
+    /// What is asked for is the whole of what is read back here and nothing besides: the one pod
+    /// that holds the answer, written as MathML. The service otherwise works out a dozen pods
+    /// saying something further about the answer and renders every one of them as an image, which
+    /// is work done and bytes sent for pictures nothing will ever fetch.
     /// </remarks>
     private Uri BuildQueryUri(string input)
     {
@@ -86,7 +87,7 @@ public sealed class WolframAlphaFullResultsClient
         return new Uri(
             string.Create(
                 CultureInfo.InvariantCulture,
-                $"query?appid={Uri.EscapeDataString(options.AppId)}&input={Uri.EscapeDataString(input)}&format=plaintext&output=xml"),
+                $"query?appid={Uri.EscapeDataString(options.AppId)}&input={Uri.EscapeDataString(input)}&format=mathml&includepodid=Result&output=json"),
             UriKind.Relative);
     }
 

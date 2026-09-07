@@ -90,7 +90,7 @@
 
             <Grid
                 Grid.Row="1"
-                Height="48"
+                MaxHeight="256"
                 Margin="16"
                 ColumnSpacing="12">
                 <Grid.ColumnDefinitions>
@@ -110,13 +110,43 @@
                 <!-- Only ever one of the two is shown, so they share a cell and each centres
                      itself against the equals sign rather than stacking away from it. -->
                 <Grid Grid.Column="1">
-                    <TextBlock
-                        x:Name="ResultText"
+                    <!-- The result is markup rather than a line of text — a fraction stays a
+                         fraction, a root keeps its sign — and a rich edit box in math mode is the
+                         one thing here that can set it. Nothing is typed into it, so everything
+                         that makes it look like a box to type into is taken away: it is the same
+                         surface as the window behind it, with the answer standing on it. -->
+                    <RichEditBox
+                        x:Name="ResultBox"
                         VerticalAlignment="Center"
+                        Padding="0"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        CornerRadius="0"
                         FontFamily="{StaticResource MathFontFamily}"
                         FontSize="32"
-                        IsTextSelectionEnabled="True"
-                        TextWrapping="Wrap" />
+                        IsReadOnly="True"
+                        IsSpellCheckEnabled="False"
+                        IsTabStop="False"
+                        TextWrapping="Wrap"
+                        ScrollViewer.HorizontalScrollBarVisibility="Hidden"
+                        ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                        AutomationProperties.Name="Result">
+                        <!-- The fills and outlines a text box paints itself with come from the
+                             theme by name, one per state, and are what would otherwise show a
+                             panel around the answer. Answering the lookup here, on the box
+                             itself, is what leaves it with none of them. -->
+                        <RichEditBox.Resources>
+                            <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                            <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="Transparent" />
+                        </RichEditBox.Resources>
+                    </RichEditBox>
                     <TextBlock
                         x:Name="MessageText"
                         VerticalAlignment="Center"

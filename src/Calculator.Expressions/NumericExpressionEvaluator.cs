@@ -23,7 +23,8 @@ namespace Calculator.Expressions;
 /// </para>
 /// <para>
 /// What a subclass adds is the number type the arithmetic is done in, and the spelling of the
-/// result that follows from it.
+/// result that follows from it. The answer is a number and nothing else, whichever type worked it
+/// out, so it goes back as the markup of one: a <c>mn</c> with the math element around it.
 /// </para>
 /// </remarks>
 public abstract class NumericExpressionEvaluator : IExpressionEvaluator
@@ -32,10 +33,10 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
     public abstract string DisplayName { get; }
 
     /// <inheritdoc />
-    public abstract ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken);
+    public abstract ValueTask<XDocument> EvaluateAsync(string expression, CancellationToken cancellationToken);
 
     /// <inheritdoc />
-    public ValueTask<string> EvaluateAsync(XDocument mathML, CancellationToken cancellationToken)
+    public ValueTask<XDocument> EvaluateAsync(XDocument mathML, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(mathML);
 

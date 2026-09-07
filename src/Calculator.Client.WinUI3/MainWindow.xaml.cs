@@ -57,6 +57,13 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private readonly IDisposable _readings;
 
+    /// <summary>
+    /// The markup currently on the result line, which is what the copy button copies. The box it
+    /// is set into cannot be asked for it back as it went in — what comes out of a rich edit box
+    /// is the markup of what it drew, not the markup it was given.
+    /// </summary>
+    private XDocument? _result;
+
     public MainWindow(IEnumerable<IExpressionEvaluator> evaluators)
     {
         ArgumentNullException.ThrowIfNull(evaluators);
@@ -76,6 +83,15 @@ public sealed partial class MainWindow : Window
         // Setting the math mode empties the box, so it happens before anything is in it. From
         // here on the box takes UnicodeMath — 1/2 builds a fraction, and so on.
         InputBox.TextDocument.SetMathMode(RichEditMathMode.MathOnly);
+
+        // The result box is never typed into, but it is set from MathML, and only a box in math
+        // mode builds what that markup describes rather than spelling it out.
+        ResultBox.TextDocument.SetMathMode(RichEditMathMode.MathOnly);
+
+        // A math zone is typeset by Rich Edit's own equation renderer, which does not follow along
+        // when the theme the box's Foreground is bound to changes underneath it. Colouring it
+        // again is what keeps the answer visible after a light-to-dark switch, not just at first.
+        RootGrid.ActualThemeChanged += (_, _) => ApplyResultForeground();
 
         ShowNothing();
     }
@@ -315,17 +331,56 @@ public sealed partial class MainWindow : Window
 
     private void ShowNothing()
     {
-        ResultText.Visibility = Visibility.Collapsed;
+        _result = null;
+        ResultBox.Visibility = Visibility.Collapsed;
         MessageText.Visibility = Visibility.Collapsed;
         CopyResultButton.Visibility = Visibility.Collapsed;
     }
 
-    private void ShowValue(string value)
+    /// <summary>
+    /// Puts the answer on the line as the markup it is, so that what was worked out is drawn the
+    /// way it would be written rather than flattened into a sentence about itself.
+    /// </summary>
+    /// <remarks>
+    /// The box is read-only so that nobody types into it, and read-only is exactly what stops the
+    /// answer being put in as well, so it is lifted for the one call that sets it. The formatting
+    /// is dropped on the way in: whitespace between elements is whitespace in the expression as
+    /// far as a rich edit box is concerned.
+    /// </remarks>
+    private void ShowValue(XDocument value)
     {
-        ResultText.Text = value;
-        ResultText.Visibility = Visibility.Visible;
+        _result = value;
+
+        ResultBox.IsReadOnly = false;
+        ResultBox.TextDocument.SetMathML(value.ToString(SaveOptions.DisableFormatting));
+        ApplyResultForeground();
+        ResultBox.IsReadOnly = true;
+
+        ResultBox.Visibility = Visibility.Visible;
         MessageText.Visibility = Visibility.Collapsed;
         CopyResultButton.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>
+    /// Colours the answer in the theme's ordinary text colour.
+    /// </summary>
+    /// <remarks>
+    /// A math zone is drawn by Rich Edit's own equation renderer rather than by the ordinary
+    /// character formatting a typed line would pick up, and it is given a black glyph colour by
+    /// default regardless of what the box's <see cref="Control.Foreground"/> says — which on a
+    /// dark theme leaves the answer unreadable against the surface behind it. Colouring the whole
+    /// range once the markup is in, in the same brush the box is themed with, is what makes the
+    /// answer follow the theme instead of standing apart from it.
+    /// </remarks>
+    private void ApplyResultForeground()
+    {
+        if (ResultBox.Foreground is not SolidColorBrush brush)
+        {
+            return;
+        }
+
+        var range = ResultBox.TextDocument.GetRange(0, TextConstants.MaxUnitCount);
+        range.CharacterFormat.ForegroundColor = brush.Color;
     }
 
     /// <summary>
@@ -335,7 +390,8 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void ShowMessage(string message, bool isHint)
     {
-        ResultText.Visibility = Visibility.Collapsed;
+        _result = null;
+        ResultBox.Visibility = Visibility.Collapsed;
         MessageText.Text = message;
         MessageText.Foreground = (Brush)RootGrid.Resources[isHint ? "MessageHintBrush" : "MessageErrorBrush"];
         MessageText.Visibility = Visibility.Visible;
@@ -343,14 +399,23 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Puts the value currently on the result line onto the clipboard. There is nothing to read
-    /// this back from within the app — the box does not accept plain numbers as math input — so
-    /// this is purely for pasting the answer somewhere else.
+    /// Puts the value currently on the result line onto the clipboard.
     /// </summary>
+    /// <remarks>
+    /// An answer that is a bare number goes over as that number, which is what anywhere else would
+    /// want of it — a spreadsheet cell, a message, the box this was typed into. An answer that is
+    /// anything more than a number has no such plain reading, and goes over as the markup of what
+    /// is on the line, which is the only thing that keeps it whole.
+    /// </remarks>
     private void CopyResultButtonClick(object sender, RoutedEventArgs e)
     {
+        if (_result is not { } result)
+        {
+            return;
+        }
+
         var content = new DataPackage();
-        content.SetText(ResultText.Text);
+        content.SetText(MathML.AsNumber(result) ?? result.ToString(SaveOptions.DisableFormatting));
         Clipboard.SetContent(content);
     }
 
@@ -358,11 +423,11 @@ public sealed partial class MainWindow : Window
     /// What one reading of the box came to: a value for the line, something standing in the way
     /// of one, or nothing at all because there was nothing in the box to read.
     /// </summary>
-    private readonly record struct Reading(string? Value, string? Message, bool IsHint)
+    private readonly record struct Reading(XDocument? Value, string? Message, bool IsHint)
     {
         public static Reading Nothing => default;
 
-        public static Reading Of(string value) => new(value, null, false);
+        public static Reading Of(XDocument value) => new(value, null, false);
 
         public static Reading Problem(string message, bool isHint) => new(null, message, isHint);
     }

@@ -129,6 +129,39 @@ public sealed class WolframAlphaExpressionEvaluatorTests
             () => Linearize("<mmultiscripts><mi>x</mi><mn>1</mn><none/></mmultiscripts>"));
     }
 
+    [TestMethod]
+    public void ParseMathML_TheMarkupOfAnAnswer_IsReadDespiteWhatItCarries()
+    {
+        // What comes back is laid out over several lines and carries attributes of its own.
+        // Neither is part of the expression.
+        var result = WolframAlphaExpressionEvaluator.ParseMathML(
+            "<math xmlns='http://www.w3.org/1998/Math/MathML'\n" +
+            "    mathematica:form='StandardForm'\n" +
+            "    xmlns:mathematica='http://www.wolfram.com/XML/'>\n <mn>357</mn>\n</math>");
+
+        Assert.AreEqual("357", MathML.AsNumber(result));
+    }
+
+    [TestMethod]
+    public void ParseMathML_AnAnswerBuiltUpRatherThanFlat_KeepsTheWayItIsBuilt()
+    {
+        // What the service can say and a number type cannot: a fraction left as a fraction. It is
+        // worth nothing flattened, and is only kept by being read as the markup it came as.
+        var result = WolframAlphaExpressionEvaluator.ParseMathML(
+            "<math xmlns='http://www.w3.org/1998/Math/MathML'>" +
+            "<mfrac><mn>1</mn><mn>3</mn></mfrac></math>");
+
+        Assert.IsNull(MathML.AsNumber(result));
+        Assert.AreEqual("mfrac", result.Root?.Elements().Single().Name.LocalName);
+    }
+
+    [TestMethod]
+    public void ParseMathML_MarkupThatIsNotMarkup_IsRefused()
+    {
+        Assert.ThrowsExactly<WolframAlphaException>(
+            () => WolframAlphaExpressionEvaluator.ParseMathML("<math><mn>357"));
+    }
+
     private static string Linearize(string content) => WolframAlphaExpressionEvaluator.Linearize(
         XDocument.Parse($"<math xmlns=\"http://www.w3.org/1998/Math/MathML\">{content}</math>"));
 }

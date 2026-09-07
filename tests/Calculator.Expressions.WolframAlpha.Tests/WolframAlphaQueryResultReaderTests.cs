@@ -1,50 +1,67 @@
 namespace Calculator.Expressions.WolframAlpha.Tests;
 
 /// <summary>
-/// Reading the XML a query comes back as, and finding the one line in it that is the answer.
+/// Reading the JSON a query comes back as, and finding the markup in it that is the answer.
 /// </summary>
 [TestClass]
 public sealed class WolframAlphaQueryResultReaderTests
 {
     [TestMethod]
-    public void Read_AnAnswer_TakesTheTextUnderThePrimaryPod()
+    public void Read_AnAnswer_TakesTheMarkupUnderThePrimaryPod()
     {
         var result = WolframAlphaQueryResultReader.Read(SumOfOneHundredTwentyThreeAndTwoHundredThirtyFour);
 
         Assert.IsTrue(result.Success);
         Assert.IsNull(result.Error);
-        Assert.AreEqual("357", result.PrimaryPlainText);
+        Assert.IsTrue(result.PrimaryMathML!.Contains("<mn>357</mn>", StringComparison.Ordinal));
+    }
+
+    [TestMethod]
+    public void Read_TheMarkupOfAnAnswer_IsTakenAsItStands()
+    {
+        // It travels as a string inside the JSON and is left one here. What it describes is read
+        // afterwards, and elsewhere.
+        var result = WolframAlphaQueryResultReader.Read(Answer("<math><mn>357</mn></math>"));
+
+        Assert.AreEqual("<math><mn>357</mn></math>", result.PrimaryMathML);
+    }
+
+    [TestMethod]
+    public void Read_MarkupTheServiceEscaped_IsUnescapedByTheReadingOfTheJson()
+    {
+        var result = WolframAlphaQueryResultReader.Read(Answer(
+            "\\u003Cmath\\u003E\\u003Cmn\\u003E357\\u003C/mn\\u003E\\u003C/math\\u003E"));
+
+        Assert.AreEqual("<math><mn>357</mn></math>", result.PrimaryMathML);
     }
 
     [TestMethod]
     public void Read_AnAnswer_KeepsEveryPodInTheOrderTheyCame()
     {
-        var result = WolframAlphaQueryResultReader.Read(SumOfOneHundredTwentyThreeAndTwoHundredThirtyFour);
+        // Only the result pod is asked for, but nothing here depends on the service sending that
+        // and only that.
+        var result = WolframAlphaQueryResultReader.Read(
+            """
+            {"queryresult": {"success": true, "error": false, "pods": [
+              {"title": "Input", "id": "Input", "subpods": [{"title": ""}]},
+              {"title": "Result", "id": "Result", "primary": true, "subpods": [{"title": ""}]}
+            ]}}
+            """);
 
-        Assert.AreSequenceEqual(
-            ["Input", "Result", "NumberName", "NumberLine"],
-            result.Pods.Select(pod => pod.Id));
+        Assert.AreSequenceEqual(["Input", "Result"], result.Pods!.Select(pod => pod.Id));
     }
 
     [TestMethod]
     public void Read_APodThatIsOnlyAPicture_HasNothingWrittenOut()
     {
-        var result = WolframAlphaQueryResultReader.Read(SumOfOneHundredTwentyThreeAndTwoHundredThirtyFour);
+        var result = WolframAlphaQueryResultReader.Read(
+            """
+            {"queryresult": {"success": true, "error": false, "pods": [
+              {"title": "Number line", "id": "NumberLine", "subpods": [{"title": ""}]}
+            ]}}
+            """);
 
-        var numberLine = result.Pods.Single(pod => pod.Id == "NumberLine");
-
-        Assert.IsNull(numberLine.Subpods.Single().PlainText);
-    }
-
-    [TestMethod]
-    public void Read_TheInputPod_IsNotMistakenForTheAnswer()
-    {
-        // It comes first, is written out, and says something that looks like an expression. Only
-        // the primary flag tells it apart from the pod that answers the query.
-        var result = WolframAlphaQueryResultReader.Read(SumOfOneHundredTwentyThreeAndTwoHundredThirtyFour);
-
-        Assert.IsFalse(result.Pods.Single(pod => pod.Id == "Input").IsPrimary);
-        Assert.AreNotEqual("123 + 234", result.PrimaryPlainText);
+        Assert.IsNull(result.Pods!.Single().Subpods!.Single().MathML);
     }
 
     [TestMethod]
@@ -52,33 +69,30 @@ public sealed class WolframAlphaQueryResultReaderTests
     {
         var result = WolframAlphaQueryResultReader.Read(
             """
-            <queryresult success="true" error="false">
-              <pod title="Input" id="Input" position="1">
-                <subpod title=""><plaintext>2^10</plaintext></subpod>
-              </pod>
-              <pod title="Result" id="Result" position="11">
-                <subpod title=""><plaintext>1024</plaintext></subpod>
-              </pod>
-            </queryresult>
+            {"queryresult": {"success": true, "error": false, "pods": [
+              {"title": "Result", "id": "Result", "subpods": [
+                {"title": "", "mathml": "<math><mn>1024</mn></math>"}
+              ]}
+            ]}}
             """);
 
-        Assert.AreEqual("1024", result.PrimaryPlainText);
+        Assert.AreEqual("<math><mn>1024</mn></math>", result.PrimaryMathML);
     }
 
     [TestMethod]
-    public void Read_APrimaryPodWhoseFirstSubpodIsAPicture_TakesTheFirstOneWithText()
+    public void Read_APrimaryPodWhoseFirstSubpodIsAPicture_TakesTheFirstOneWithMarkup()
     {
         var result = WolframAlphaQueryResultReader.Read(
             """
-            <queryresult success="true" error="false">
-              <pod title="Plot" id="Plot" primary="true">
-                <subpod title=""><plaintext/></subpod>
-                <subpod title=""><plaintext>x = 3</plaintext></subpod>
-              </pod>
-            </queryresult>
+            {"queryresult": {"success": true, "error": false, "pods": [
+              {"title": "Plot", "id": "Plot", "primary": true, "subpods": [
+                {"title": ""},
+                {"title": "", "mathml": "<math><mn>3</mn></math>"}
+              ]}
+            ]}}
             """);
 
-        Assert.AreEqual("x = 3", result.PrimaryPlainText);
+        Assert.AreEqual("<math><mn>3</mn></math>", result.PrimaryMathML);
     }
 
     [TestMethod]
@@ -86,15 +100,13 @@ public sealed class WolframAlphaQueryResultReaderTests
     {
         var result = WolframAlphaQueryResultReader.Read(
             """
-            <queryresult success="true" error="false">
-              <pod title="Plot" id="Plot" primary="true">
-                <subpod title=""><plaintext/></subpod>
-              </pod>
-            </queryresult>
+            {"queryresult": {"success": true, "error": false, "pods": [
+              {"title": "Plot", "id": "Plot", "primary": true, "subpods": [{"title": ""}]}
+            ]}}
             """);
 
         Assert.IsTrue(result.Success);
-        Assert.IsNull(result.PrimaryPlainText);
+        Assert.IsNull(result.PrimaryMathML);
     }
 
     [TestMethod]
@@ -102,14 +114,14 @@ public sealed class WolframAlphaQueryResultReaderTests
     {
         var result = WolframAlphaQueryResultReader.Read(
             """
-            <queryresult success="false" error="false" numpods="0">
-              <tips count="1"><tip text="Check your spelling, and use English"/></tips>
-            </queryresult>
+            {"queryresult": {"success": false, "error": false, "numpods": 0,
+              "tips": {"text": "Check your spelling, and use English"}}}
             """);
 
         Assert.IsFalse(result.Success);
         Assert.IsNull(result.Error);
-        Assert.IsEmpty(result.Pods);
+        Assert.IsNull(result.Pods);
+        Assert.IsNull(result.PrimaryMathML);
     }
 
     [TestMethod]
@@ -117,9 +129,7 @@ public sealed class WolframAlphaQueryResultReaderTests
     {
         var result = WolframAlphaQueryResultReader.Read(
             """
-            <queryresult success="false" error="true">
-              <error><code>1</code><msg>Invalid appid</msg></error>
-            </queryresult>
+            {"queryresult": {"success": false, "error": {"code": "1", "msg": "Invalid appid"}}}
             """);
 
         Assert.IsFalse(result.Success);
@@ -128,34 +138,28 @@ public sealed class WolframAlphaQueryResultReaderTests
     }
 
     [TestMethod]
-    public void Read_AnAnswerWhosePodsFailed_DoesNotReadTheirFlagAsAnError()
+    public void Read_AnAnswerThatWentWell_DoesNotReadItsErrorFlagAsAnError()
     {
-        // Every pod carries an error flag of its own, and the answer as a whole carries one too.
-        // Neither is the element that says what an error was.
-        var result = WolframAlphaQueryResultReader.Read(
-            """
-            <queryresult success="true" error="false">
-              <pod title="Result" id="Result" error="false" primary="true">
-                <subpod title=""><plaintext>7</plaintext></subpod>
-              </pod>
-            </queryresult>
-            """);
+        // The same word stands for the flag saying nothing went wrong and for what says what did.
+        // Only the second is an error, and the first is not something that could not be read.
+        var result = WolframAlphaQueryResultReader.Read(SumOfOneHundredTwentyThreeAndTwoHundredThirtyFour);
 
         Assert.IsNull(result.Error);
+        Assert.IsNotNull(result.PrimaryMathML);
     }
 
     [TestMethod]
-    public void Read_SomethingThatIsNotXml_IsRefused()
+    public void Read_SomethingThatIsNotJson_IsRefused()
     {
         Assert.ThrowsExactly<WolframAlphaException>(
-            () => WolframAlphaQueryResultReader.Read("<queryresult success=\"true\""));
+            () => WolframAlphaQueryResultReader.Read("{\"queryresult\": "));
     }
 
     [TestMethod]
-    public void Read_XmlThatIsNotAnAnswer_IsRefused()
+    public void Read_JsonThatIsNotAnAnswer_IsRefused()
     {
         Assert.ThrowsExactly<WolframAlphaException>(
-            () => WolframAlphaQueryResultReader.Read("<html><body>Gateway timeout</body></html>"));
+            () => WolframAlphaQueryResultReader.Read("{\"error\": \"Gateway timeout\"}"));
     }
 
     [TestMethod]
@@ -166,53 +170,68 @@ public sealed class WolframAlphaQueryResultReaderTests
 
         var result = await WolframAlphaQueryResultReader.ReadAsync(stream, TestContext.CancellationToken);
 
-        Assert.AreEqual("357", result.PrimaryPlainText);
+        Assert.IsTrue(result.PrimaryMathML!.Contains("<mn>357</mn>", StringComparison.Ordinal));
     }
 
     public TestContext TestContext { get; set; } = null!;
 
     /// <summary>
-    /// What the service sends back for <c>123+234</c>, as it sends it.
+    /// One answer holding <paramref name="mathML"/>, which travels as a string inside the JSON —
+    /// so what is written here is the markup as JSON spells it rather than as XML does.
+    /// </summary>
+    private static string Answer(string mathML) =>
+        $$$"""
+        {"queryresult": {"success": true, "error": false, "pods": [
+          {"title": "Result", "id": "Result", "primary": true, "subpods": [
+            {"title": "", "mathml": "{{{mathML}}}"}
+          ]}
+        ]}}
+        """;
+
+    /// <summary>
+    /// What the service sends back for <c>123+234</c>: the one pod that was asked for, and markup
+    /// laid out over several lines and carrying attributes of its own.
     /// </summary>
     private const string SumOfOneHundredTwentyThreeAndTwoHundredThirtyFour =
         """
-        <queryresult success="true" error="false" numpods="4" datatypes="Math" parsetiming="0.056" parsetimedout="false" id="V6xvpKNlXcI=" kernelId="337" processId="929880" version="2.6" inputstring="123+234" sbsallowed="false" timing="0.621" timedout="" timedoutpods="">
-        <pod title="Input" numsubpods="1" error="false" scanner="Identity" id="Input" position="1">
-        <subpod title="">
-        <img src="https://public5c.wolframalpha.com/files/GIF_j5u8d362zg.gif" alt="123 + 234" title="123 + 234" width="68" height="22" type="Default" themes="1,2,3" colorinvertable="true" contenttype="image/gif"/>
-        <plaintext>123 + 234</plaintext>
-        </subpod>
-        <expressiontypes count="1">
-        <expressiontype name="Default"/>
-        </expressiontypes>
-        </pod>
-        <pod title="Result" numsubpods="1" error="false" scanner="Simplification" id="Result" position="11" primary="true">
-        <subpod title="">
-        <img src="https://public5c.wolframalpha.com/files/GIF_j5ufzp0k2z.gif" alt="357" title="357" width="27" height="22" type="Default" themes="1,2,3" colorinvertable="true" contenttype="image/gif"/>
-        <plaintext>357</plaintext>
-        </subpod>
-        <expressiontypes count="1">
-        <expressiontype name="Default"/>
-        </expressiontypes>
-        </pod>
-        <pod title="Number name" numsubpods="1" error="false" scanner="Integer" id="NumberName" position="910">
-        <subpod title="">
-        <img src="https://public5c.wolframalpha.com/files/GIF_j5udoozrs7.gif" alt="three hundred fifty-seven" title="three hundred fifty-seven" width="168" height="22" type="Default" themes="1,2,3" colorinvertable="true" contenttype="image/gif"/>
-        <plaintext>three hundred fifty-seven</plaintext>
-        </subpod>
-        <expressiontypes count="1">
-        <expressiontype name="Default"/>
-        </expressiontypes>
-        </pod>
-        <pod title="Number line" numsubpods="1" error="false" scanner="NumberLine" id="NumberLine" position="912">
-        <subpod title="">
-        <img src="https://public5c.wolframalpha.com/files/GIF_j5ugzmn711.gif" alt="Number line" title="" width="302" height="49" type="2DMathPlot_2" themes="1,2,3" colorinvertable="true" contenttype="image/gif"/>
-        <plaintext/>
-        </subpod>
-        <expressiontypes count="1">
-        <expressiontype name="Default"/>
-        </expressiontypes>
-        </pod>
-        </queryresult>
+        {
+          "queryresult": {
+            "success": true,
+            "error": false,
+            "numpods": 1,
+            "datatypes": "Math",
+            "parsetiming": 0.106,
+            "parsetimedout": false,
+            "id": "V6xvpKNlXcI=6",
+            "kernelId": "774",
+            "processId": 1872674,
+            "version": "2.6",
+            "inputstring": "123+234",
+            "sbsallowed": false,
+            "pods": [
+              {
+                "title": "Result",
+                "subpods": [
+                  {
+                    "title": "",
+                    "mathml": "<math xmlns='http://www.w3.org/1998/Math/MathML'\n    mathematica:form='StandardForm'\n    xmlns:mathematica='http://www.wolfram.com/XML/'>\n <mn>357</mn>\n</math>"
+                  }
+                ],
+                "numsubpods": 1,
+                "error": false,
+                "scanner": "Simplification",
+                "id": "Result",
+                "position": 11,
+                "primary": true,
+                "expressiontypes": {
+                  "name": "Default"
+                }
+              }
+            ],
+            "timing": 0.306,
+            "timedout": "",
+            "timedoutpods": ""
+          }
+        }
         """;
 }

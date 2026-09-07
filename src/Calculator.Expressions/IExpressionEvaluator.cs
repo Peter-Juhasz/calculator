@@ -3,7 +3,7 @@ using System.Xml.Linq;
 namespace Calculator.Expressions;
 
 /// <summary>
-/// One way of working out an expression, from what was typed to the text of its answer.
+/// One way of working out an expression, from what was typed to the markup of its answer.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,9 +15,10 @@ namespace Calculator.Expressions;
 /// what it can read.
 /// </para>
 /// <para>
-/// What a caller sees either way is a name to offer the reader and a string to put on the line:
-/// what worked the expression out, and how its value is written, are the implementation's
-/// business.
+/// The answer goes back the same way it came, as MathML. Arithmetic done here has only ever the
+/// one shape of answer and wraps its number in the markup; a service that does algebra can answer
+/// with a fraction, a root or an equation, which nothing on one line would say faithfully. What a
+/// caller sees either way is a name to offer the reader and one document to put on the line.
 /// </para>
 /// </remarks>
 public interface IExpressionEvaluator
@@ -28,7 +29,8 @@ public interface IExpressionEvaluator
     string DisplayName { get; }
 
     /// <summary>
-    /// Works out <paramref name="expression"/> and writes its value out for reading.
+    /// Works out <paramref name="expression"/> and writes its value out as the markup of one
+    /// expression, with a <c>math</c> element at the root of it.
     /// </summary>
     /// <exception cref="ExpressionFormatException">The expression could not be read.</exception>
     /// <exception cref="DivideByZeroException">The expression divides by zero.</exception>
@@ -41,11 +43,11 @@ public interface IExpressionEvaluator
     /// <exception cref="OperationCanceledException">
     /// <paramref name="cancellationToken"/> was cancelled.
     /// </exception>
-    ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken);
+    ValueTask<XDocument> EvaluateAsync(string expression, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Works out the expression written in <paramref name="mathML"/> and writes its value out for
-    /// reading.
+    /// Works out the expression written in <paramref name="mathML"/> and writes its value out as
+    /// the markup of one expression, with a <c>math</c> element at the root of it.
     /// </summary>
     /// <param name="mathML">
     /// The markup of one expression as it stands on the screen, with a <c>math</c> element at the
@@ -65,5 +67,5 @@ public interface IExpressionEvaluator
     /// <exception cref="OperationCanceledException">
     /// <paramref name="cancellationToken"/> was cancelled.
     /// </exception>
-    ValueTask<string> EvaluateAsync(XDocument mathML, CancellationToken cancellationToken);
+    ValueTask<XDocument> EvaluateAsync(XDocument mathML, CancellationToken cancellationToken);
 }

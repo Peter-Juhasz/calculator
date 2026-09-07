@@ -152,7 +152,21 @@ public sealed class NumericExpressionEvaluatorTests
             XDocument.Parse(Document("<mn>1</mn><mo>+</mo><mn>2</mn>")),
             CancellationToken.None);
 
-        Assert.AreEqual("3", result);
+        Assert.AreEqual("3", MathML.AsNumber(result));
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_AnAnswer_ComesBackAsTheMarkupOfANumber()
+    {
+        // Arithmetic done here answers with a number and nothing else, but it answers in the same
+        // markup as everything that can say more, so that one thing shows every answer.
+        var result = await new DecimalExpressionEvaluator().EvaluateAsync(
+            XDocument.Parse(Document("<mn>1</mn><mo>+</mo><mn>2</mn>")),
+            CancellationToken.None);
+
+        Assert.AreEqual(
+            "<math xmlns=\"http://www.w3.org/1998/Math/MathML\"><mn>3</mn></math>",
+            result.ToString(SaveOptions.DisableFormatting));
     }
 
     [TestMethod]
@@ -164,7 +178,7 @@ public sealed class NumericExpressionEvaluatorTests
             XDocument.Parse(Document("<mfrac><mn>5</mn><mn>2</mn></mfrac>")),
             CancellationToken.None);
 
-        Assert.AreEqual("2", result);
+        Assert.AreEqual("2", MathML.AsNumber(result));
     }
 
     [TestMethod]

@@ -1,4 +1,5 @@
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace Calculator.Expressions.WolframAlpha;
@@ -11,8 +12,12 @@ namespace Calculator.Expressions.WolframAlpha;
 /// The other evaluators work an expression out here, in a number type chosen in advance, and are
 /// bounded by what that type can say. This one does no arithmetic at all: it sends the line off
 /// and reads back the answer, so it can be asked things the grammar in this app does not have —
-/// a square root, a logarithm, a constant by name — and answers a plain sum with the same
-/// sentence a person would write.
+/// a square root, a logarithm, a constant by name — and can answer with something a number type
+/// has no way of holding, a fraction left unresolved or an equation solved for x.
+/// </para>
+/// <para>
+/// The answer is asked for and handed on as MathML, which is what makes that possible: it comes
+/// back built up the way it would be written by hand rather than flattened onto a line.
 /// </para>
 /// <para>
 /// Being able to ask for more is also why the markup is read differently here. Where the
@@ -44,7 +49,7 @@ public sealed class WolframAlphaExpressionEvaluator : IExpressionEvaluator
     /// <exception cref="WolframAlphaException">
     /// Wolfram Alpha could not be asked, or did not answer with a result.
     /// </exception>
-    public async ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken)
+    public async ValueTask<XDocument> EvaluateAsync(string expression, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(expression);
 
@@ -70,8 +75,33 @@ public sealed class WolframAlphaExpressionEvaluator : IExpressionEvaluator
                 isIncomplete: true);
         }
 
-        return result.PrimaryPlainText
+        var markup = result.PrimaryMathML
             ?? throw new WolframAlphaException("Wolfram Alpha answered without a result to show.");
+
+        return ParseMathML(markup);
+    }
+
+    /// <summary>
+    /// Reads the markup of an answer as the expression it describes.
+    /// </summary>
+    /// <remarks>
+    /// The markup travels as a string inside the answer, so it arrives already read once, as JSON,
+    /// and is still only a run of characters at that point. This is the second reading, and the one
+    /// that makes an expression of it.
+    /// </remarks>
+    /// <exception cref="WolframAlphaException">The markup is malformed.</exception>
+    public static XDocument ParseMathML(string markup)
+    {
+        ArgumentNullException.ThrowIfNull(markup);
+
+        try
+        {
+            return XDocument.Parse(markup);
+        }
+        catch (XmlException exception)
+        {
+            throw new WolframAlphaException("Wolfram Alpha sent back something unreadable.", exception);
+        }
     }
 
     /// <exception cref="ExpressionFormatException">
@@ -80,7 +110,7 @@ public sealed class WolframAlphaExpressionEvaluator : IExpressionEvaluator
     /// <exception cref="WolframAlphaException">
     /// Wolfram Alpha could not be asked, or did not answer with a result.
     /// </exception>
-    public ValueTask<string> EvaluateAsync(XDocument mathML, CancellationToken cancellationToken)
+    public ValueTask<XDocument> EvaluateAsync(XDocument mathML, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(mathML);
 

@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Numerics;
+using System.Xml.Linq;
 
 namespace Calculator.Expressions;
 
@@ -23,12 +24,13 @@ public sealed class BigIntegerExpressionEvaluator : NumericExpressionEvaluator
 
     public override string DisplayName => "Integer";
 
-    public override ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken)
+    public override ValueTask<XDocument> EvaluateAsync(string expression, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
         var value = ExpressionEvaluator.Evaluate<BigInteger>(expression);
 
-        return ValueTask.FromResult(value.ToString(ResultFormat, CultureInfo.CurrentCulture));
+        return ValueTask.FromResult(
+            MathML.Number(value.ToString(ResultFormat, CultureInfo.CurrentCulture)));
     }
 }
