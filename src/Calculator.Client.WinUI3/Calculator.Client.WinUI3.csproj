@@ -25,12 +25,23 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.*" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.*" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.*" />
     <PackageReference Include="System.Reactive" Version="7.*" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Calculator.Expressions\Calculator.Expressions.csproj" />
+    <ProjectReference Include="..\Calculator.Expressions.WolframAlpha\Calculator.Expressions.WolframAlpha.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Read from beside the exe at startup, so the app id can be set without rebuilding. -->
+    <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include=".env" Condition="Exists('.env')" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Every compiled XAML page is indexed into Acc.pri rather than written beside the exe, and the

@@ -1,4 +1,5 @@
 using Calculator.Expressions;
+using Calculator.Expressions.WolframAlpha;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Text;
 using Microsoft.UI.Windowing;
@@ -35,11 +36,7 @@ public sealed partial class MainWindow : Window
     /// are offered. The first is what the window starts on, so it is the one most expressions
     /// want.
     /// </summary>
-    private static readonly IExpressionEvaluator[] Evaluators =
-    [
-        new DecimalExpressionEvaluator(),
-        new BigIntegerExpressionEvaluator(),
-    ];
+    private readonly IReadOnlyList<IExpressionEvaluator> _evaluatorChoices;
 
     /// <summary>
     /// What the box holds, as of each keystroke. Nothing here is worked out yet — the readings
@@ -58,8 +55,12 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private readonly IDisposable _readings;
 
-    public MainWindow()
+    public MainWindow(IEnumerable<IExpressionEvaluator> evaluators)
     {
+        ArgumentNullException.ThrowIfNull(evaluators);
+
+        _evaluatorChoices = [.. evaluators];
+
         InitializeComponent();
         ConfigureWindowChrome();
 
@@ -98,7 +99,7 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void ConfigureEvaluators()
     {
-        EvaluatorSelector.ItemsSource = Evaluators;
+        EvaluatorSelector.ItemsSource = _evaluatorChoices;
         EvaluatorSelector.SelectedIndex = 0;
     }
 
@@ -208,6 +209,13 @@ public sealed partial class MainWindow : Window
         catch (ExpressionFormatException exception)
         {
             return Reading.Problem(exception.Message, isHint: exception.IsIncomplete);
+        }
+        // An evaluator that asks a service rather than working the answer out here can fail for
+        // reasons that have nothing to do with the expression. That is worth saying plainly, and
+        // in the colour a mistake gets, because the reader can do something about it.
+        catch (WolframAlphaException exception)
+        {
+            return Reading.Problem(exception.Message, isHint: false);
         }
         catch (DivideByZeroException exception)
         {

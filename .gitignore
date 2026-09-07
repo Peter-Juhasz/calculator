@@ -363,3 +363,7 @@ MigrationBackup/
 FodyWeavers.xsd
 
 .env
+.env.*
+
+# Local settings, which is where the Wolfram Alpha app id goes.
+appsettings.local.json

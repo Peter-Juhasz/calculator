@@ -9,8 +9,10 @@
       <Platform Solution="*|x64" Project="x64" />
     </Project>
     <Project Path="src/Calculator.Expressions/Calculator.Expressions.csproj" />
+    <Project Path="src/Calculator.Expressions.WolframAlpha/Calculator.Expressions.WolframAlpha.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Calculator.Expressions.Tests/Calculator.Expressions.Tests.csproj" />
+    <Project Path="tests/Calculator.Expressions.WolframAlpha.Tests/Calculator.Expressions.WolframAlpha.Tests.csproj" />
   </Folder>
 </Solution>
