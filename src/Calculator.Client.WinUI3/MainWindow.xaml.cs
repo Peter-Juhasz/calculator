@@ -6,6 +6,8 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.System;
@@ -22,6 +24,13 @@ public sealed partial class MainWindow : Window
     private static readonly SizeInt32 InitialSize = new(720, 430);
 
     /// <summary>
+    /// How long the typing has to stop for before what was typed is worked out. Long enough that
+    /// a number being typed in is not read digit by digit, short enough that the result still
+    /// reads as following the keystroke rather than a pause after it.
+    /// </summary>
+    private static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(250);
+
+    /// <summary>
     /// The ways of working an expression out that are offered to the reader, in the order they
     /// are offered. The first is what the window starts on, so it is the one most expressions
     /// want.
@@ -33,16 +42,32 @@ public sealed partial class MainWindow : Window
     ];
 
     /// <summary>
-    /// Cancels the reading that is currently under way. Every keystroke supersedes the one before
-    /// it, so an answer that is still being worked out when the expression changes is no longer
-    /// wanted.
+    /// What the box holds, as of each keystroke. Nothing here is worked out yet — the readings
+    /// this feeds are what settle which of these are.
     /// </summary>
-    private CancellationTokenSource _evaluation = new();
+    private readonly Subject<string> _expressions = new();
+
+    /// <summary>
+    /// Which arithmetic the reader has settled on, as of each time they change their mind.
+    /// </summary>
+    private readonly Subject<IExpressionEvaluator> _evaluators = new();
+
+    /// <summary>
+    /// The standing arrangement that turns those two into results on the line. Held so it can be
+    /// let go of when the window closes.
+    /// </summary>
+    private readonly IDisposable _readings;
 
     public MainWindow()
     {
         InitializeComponent();
         ConfigureWindowChrome();
+
+        // Before anything is put into either of them, so that the first evaluator and the first
+        // keystroke are both seen.
+        _readings = SubscribeToReadings();
+        Closed += (_, _) => _readings.Dispose();
+
         ConfigureEvaluators();
 
         // Setting the math mode empties the box, so it happens before anything is in it. From
@@ -77,6 +102,39 @@ public sealed partial class MainWindow : Window
         EvaluatorSelector.SelectedIndex = 0;
     }
 
+    /// <summary>
+    /// Arranges for what is typed to become what is on the result line.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Typing runs ahead of arithmetic, so the keystrokes are let settle first: nothing is worked
+    /// out until the typing has paused, and an expression that comes back to what was last worked
+    /// out — a character typed and rubbed out again — is not worked out a second time. A change of
+    /// arithmetic is not made to wait like that, because it is one deliberate act rather than a
+    /// run of them.
+    /// </para>
+    /// <para>
+    /// Each reading supersedes the one before it: the arithmetic still under way when a newer
+    /// expression arrives is called off, so only the newest ever reaches the line. That waiting
+    /// and that arithmetic happen away from the UI thread, and the result is brought back to it
+    /// to be shown.
+    /// </para>
+    /// </remarks>
+    private IDisposable SubscribeToReadings()
+    {
+        var uiThread = SynchronizationContext.Current!;
+
+        return _expressions
+            .Throttle(TypingPause)
+            .DistinctUntilChanged(StringComparer.Ordinal)
+            .CombineLatest(_evaluators, (mathML, evaluator) => (MathML: mathML, Evaluator: evaluator))
+            .Select(reading => Observable.FromAsync(cancellationToken =>
+                ReadAsync(reading.MathML, reading.Evaluator, cancellationToken)))
+            .Switch()
+            .ObserveOn(uiThread)
+            .Subscribe(Show);
+    }
+
     private void CenterOnDisplay()
     {
         var workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
@@ -92,14 +150,27 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void RootGridLoaded(object sender, RoutedEventArgs e) => InputBox.Focus(FocusState.Programmatic);
 
-    private async void InputBoxTextChanged(object sender, RoutedEventArgs e) => await UpdateResultAsync();
+    /// <summary>
+    /// The box can only be read on the thread that owns it, so the markup is taken here and now;
+    /// what it comes to is settled later, and elsewhere.
+    /// </summary>
+    private void InputBoxTextChanged(object sender, RoutedEventArgs e)
+    {
+        InputBox.TextDocument.GetMathML(out var mathML);
+        _expressions.OnNext(mathML);
+    }
 
     /// <summary>
     /// The expression stands as it was typed; only the arithmetic behind it has changed. Working
     /// it out again is what makes the choice mean anything.
     /// </summary>
-    private async void EvaluatorSelectorSelectionChanged(object sender, SelectionChangedEventArgs e) =>
-        await UpdateResultAsync();
+    private void EvaluatorSelectorSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (EvaluatorSelector.SelectedItem is IExpressionEvaluator evaluator)
+        {
+            _evaluators.OnNext(evaluator);
+        }
+    }
 
     /// <summary>
     /// A rich edit box would take Enter as a new line. An expression is one line, and its result
@@ -114,64 +185,58 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Reads the box and works out what it comes to. Called on every keystroke, which is what
-    /// makes the result follow the expression rather than wait for it, and again whenever the
-    /// arithmetic behind it is changed.
+    /// Reads what the box handed over and works out what it comes to, or what stands in the way
+    /// of an answer. Nothing here touches the window: it says what to show, and is shown by the
+    /// thread that may.
     /// </summary>
-    private async Task UpdateResultAsync()
+    private static async Task<Reading> ReadAsync(
+        string mathML,
+        IExpressionEvaluator evaluator,
+        CancellationToken cancellationToken)
     {
-        var cancellationToken = SupersedeEvaluation();
-
-        InputBox.TextDocument.GetMathML(out var mathML);
-
         try
         {
             var expression = MathMlLinearizer.Linearize(mathML);
 
-            if (string.IsNullOrWhiteSpace(expression) || EvaluatorSelector.SelectedItem is not IExpressionEvaluator evaluator)
+            if (string.IsNullOrWhiteSpace(expression))
             {
-                ShowNothing();
-                return;
+                return Reading.Nothing;
             }
 
-            ShowValue(await evaluator.EvaluateAsync(expression, cancellationToken));
-        }
-        catch (OperationCanceledException)
-        {
-            // The expression moved on while this reading was under way. Whatever superseded it is
-            // already on its way to the line, so nothing is shown for this one.
+            return Reading.Of(await evaluator.EvaluateAsync(expression, cancellationToken));
         }
         catch (ExpressionFormatException exception)
         {
-            ShowMessage(exception.Message, isHint: exception.IsIncomplete);
+            return Reading.Problem(exception.Message, isHint: exception.IsIncomplete);
         }
         catch (DivideByZeroException exception)
         {
-            ShowMessage(exception.Message, isHint: false);
+            return Reading.Problem(exception.Message, isHint: false);
         }
         catch (OverflowException)
         {
-            ShowMessage("The result is too large to work out.", isHint: false);
+            return Reading.Problem("The result is too large to work out.", isHint: false);
         }
         catch (ArithmeticException exception)
         {
-            ShowMessage(exception.Message, isHint: false);
+            return Reading.Problem(exception.Message, isHint: false);
         }
     }
 
-    /// <summary>
-    /// Calls off the reading that is under way, if there is one, and hands back the token that
-    /// stands for the reading taking its place.
-    /// </summary>
-    private CancellationToken SupersedeEvaluation()
+    private void Show(Reading reading)
     {
-        var superseded = _evaluation;
-        _evaluation = new CancellationTokenSource();
-
-        superseded.Cancel();
-        superseded.Dispose();
-
-        return _evaluation.Token;
+        if (reading.Value is { } value)
+        {
+            ShowValue(value);
+        }
+        else if (reading.Message is { } message)
+        {
+            ShowMessage(message, reading.IsHint);
+        }
+        else
+        {
+            ShowNothing();
+        }
     }
 
     private void ShowNothing()
@@ -213,5 +278,18 @@ public sealed partial class MainWindow : Window
         var content = new DataPackage();
         content.SetText(ResultText.Text);
         Clipboard.SetContent(content);
+    }
+
+    /// <summary>
+    /// What one reading of the box came to: a value for the line, something standing in the way
+    /// of one, or nothing at all because there was nothing in the box to read.
+    /// </summary>
+    private readonly record struct Reading(string? Value, string? Message, bool IsHint)
+    {
+        public static Reading Nothing => default;
+
+        public static Reading Of(string value) => new(value, null, false);
+
+        public static Reading Problem(string message, bool isHint) => new(null, message, isHint);
     }
 }
