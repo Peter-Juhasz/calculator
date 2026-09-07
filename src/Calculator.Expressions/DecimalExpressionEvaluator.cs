@@ -8,7 +8,7 @@ namespace Calculator.Expressions;
 /// exactly 0.3. The cost is a narrower range, which a decimal announces by overflowing rather
 /// than quietly drifting off.
 /// </summary>
-public sealed class DecimalExpressionEvaluator : IExpressionEvaluator
+public sealed class DecimalExpressionEvaluator : NumericExpressionEvaluator
 {
     /// <summary>
     /// Up to twelve decimals are shown, grouped for reading. Trailing zeros are dropped, so a
@@ -17,9 +17,9 @@ public sealed class DecimalExpressionEvaluator : IExpressionEvaluator
     /// </summary>
     private const string ResultFormat = "#,##0.#################";
 
-    public string DisplayName => "Decimal";
+    public override string DisplayName => "Decimal";
 
-    public ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken)
+    public override ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

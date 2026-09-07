@@ -13,7 +13,7 @@ namespace Calculator.Expressions;
 /// and a division that does not come out even keeps only the whole part of its answer: in whole
 /// numbers 5/2 is 2, not 2.5.
 /// </remarks>
-public sealed class BigIntegerExpressionEvaluator : IExpressionEvaluator
+public sealed class BigIntegerExpressionEvaluator : NumericExpressionEvaluator
 {
     /// <summary>
     /// Grouped for reading, with no decimals to show. A result here can run to a great many
@@ -21,9 +21,9 @@ public sealed class BigIntegerExpressionEvaluator : IExpressionEvaluator
     /// </summary>
     private const string ResultFormat = "N0";
 
-    public string DisplayName => "Integer";
+    public override string DisplayName => "Integer";
 
-    public ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken)
+    public override ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

@@ -1,52 +1,59 @@
 using System.Text;
-using System.Xml;
 using System.Xml.Linq;
 
 namespace Calculator.Expressions;
 
 /// <summary>
-/// Turns the MathML that a math-mode rich edit box hands back into the one line of text the
-/// evaluator reads.
+/// What the evaluators that work an expression out here, each in a number type of its own, have
+/// in common: the notation they can read.
 /// </summary>
 /// <remarks>
-/// Two things happen here. Built-up notation is flattened, so a fraction stacked on the screen
-/// becomes a division of two parenthesised halves. And the many characters that all mean the
-/// same operation — the several multiplication dots, the minus sign that is not a hyphen, the
-/// spaces that only group digits — are each reduced to the single spelling the evaluator knows.
+/// <para>
+/// <see cref="ExpressionEvaluator"/> understands numbers, the four operations, powers, factorials
+/// and parentheses, and nothing else — there are no functions and no names to look up. That holds
+/// whichever number type does the arithmetic, so reading the markup is settled here, once, rather
+/// than in each evaluator or in whoever is calling one.
+/// </para>
+/// <para>
+/// Two things happen in that reading. Built-up notation is flattened, so a fraction stacked on the
+/// screen becomes a division of two parenthesised halves. And the many characters that all mean
+/// the same operation — the several multiplication dots, the minus sign that is not a hyphen, the
+/// spaces that only group digits — are each reduced to the single spelling the grammar knows.
+/// What is left over, a root or a name, is turned away rather than guessed at.
+/// </para>
+/// <para>
+/// What a subclass adds is the number type the arithmetic is done in, and the spelling of the
+/// result that follows from it.
+/// </para>
 /// </remarks>
-public static class MathMlLinearizer
+public abstract class NumericExpressionEvaluator : IExpressionEvaluator
 {
-    /// <summary>
-    /// Reads <paramref name="mathML"/> and returns the expression it holds, or an empty string
-    /// if it holds nothing.
-    /// </summary>
-    /// <exception cref="ExpressionFormatException">
-    /// The markup is not readable, or uses notation that is not supported.
-    /// </exception>
-    public static string Linearize(string mathML)
+    /// <inheritdoc />
+    public abstract string DisplayName { get; }
+
+    /// <inheritdoc />
+    public abstract ValueTask<string> EvaluateAsync(string expression, CancellationToken cancellationToken);
+
+    /// <inheritdoc />
+    public ValueTask<string> EvaluateAsync(XDocument mathML, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(mathML);
 
-        // The rich edit box pads what it hands back with a byte order mark and a terminator.
-        var markup = mathML.Trim('\uFEFF', '\0').Trim();
+        return EvaluateAsync(Linearize(mathML), cancellationToken);
+    }
 
-        if (markup.Length == 0)
-        {
-            return string.Empty;
-        }
+    /// <summary>
+    /// Reads <paramref name="mathML"/> and returns the one line of text the expression comes to,
+    /// or an empty string if it holds nothing.
+    /// </summary>
+    /// <exception cref="ExpressionFormatException">
+    /// The markup uses notation that is not supported.
+    /// </exception>
+    public static string Linearize(XDocument mathML)
+    {
+        ArgumentNullException.ThrowIfNull(mathML);
 
-        XElement? root;
-
-        try
-        {
-            root = XDocument.Parse(markup).Root;
-        }
-        catch (XmlException exception)
-        {
-            throw new ExpressionFormatException("The expression could not be read.", exception);
-        }
-
-        if (root is null)
+        if (mathML.Root is not { } root)
         {
             return string.Empty;
         }

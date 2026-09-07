@@ -9,6 +9,8 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
+using System.Xml;
+using System.Xml.Linq;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.System;
@@ -221,6 +223,12 @@ public sealed partial class MainWindow : Window
     /// of an answer. Nothing here touches the window: it says what to show, and is shown by the
     /// thread that may.
     /// </summary>
+    /// <remarks>
+    /// The expression goes to the evaluator as the markup it arrived as, rather than flattened
+    /// onto one line here first. What notation an expression may be written in depends on what is
+    /// going to work it out — a root or a name means nothing to arithmetic done in a decimal, and
+    /// a great deal to a service that does algebra — and that is not the window's to decide.
+    /// </remarks>
     private static async Task<Reading> ReadAsync(
         string mathML,
         IExpressionEvaluator evaluator,
@@ -228,9 +236,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            var expression = MathMlLinearizer.Linearize(mathML);
-
-            if (string.IsNullOrWhiteSpace(expression))
+            if (ParseMathMl(mathML) is not { } expression)
             {
                 return Reading.Nothing;
             }
@@ -259,6 +265,35 @@ public sealed partial class MainWindow : Window
         catch (ArithmeticException exception)
         {
             return Reading.Problem(exception.Message, isHint: false);
+        }
+    }
+
+    /// <summary>
+    /// Reads the markup the box handed back, or nothing at all where there was nothing in the box
+    /// to read.
+    /// </summary>
+    /// <exception cref="ExpressionFormatException">The markup is not readable.</exception>
+    private static XDocument? ParseMathMl(string mathML)
+    {
+        // The rich edit box pads what it hands back with a byte order mark and a terminator.
+        var markup = mathML.Trim('\uFEFF', '\0').Trim();
+
+        if (markup.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var document = XDocument.Parse(markup);
+
+            // An empty box still hands back a document, the math element with nothing inside it,
+            // and an expression not yet begun is not worth saying anything about.
+            return document.Root is { HasElements: true } ? document : null;
+        }
+        catch (XmlException exception)
+        {
+            throw new ExpressionFormatException("The expression could not be read.", exception);
         }
     }
 
