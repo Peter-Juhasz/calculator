@@ -17,14 +17,18 @@
             <SolidColorBrush x:Key="MessageHintBrush" Color="{ThemeResource TextFillColorTertiary}" />
             <SolidColorBrush x:Key="MessageErrorBrush" Color="{ThemeResource SystemFillColorCritical}" />
 
+            <!-- The square such a button is, named because the row it stands in has to keep that
+                 much height open whether the button is in it or not. -->
+            <x:Double x:Key="StealthIconButtonSize">36</x:Double>
+
             <!-- Invisible until pointed at: only the theme's ordinary hover and pressed fills
                  give it away, the same trick the built-in chrome buttons use for themselves. -->
             <Style x:Key="StealthIconButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
                 <Setter Property="Background" Value="Transparent" />
                 <Setter Property="BorderBrush" Value="Transparent" />
                 <Setter Property="Padding" Value="0" />
-                <Setter Property="Width" Value="36" />
-                <Setter Property="Height" Value="36" />
+                <Setter Property="Width" Value="{StaticResource StealthIconButtonSize}" />
+                <Setter Property="Height" Value="{StaticResource StealthIconButtonSize}" />
                 <Setter Property="HorizontalAlignment" Value="Center" />
                 <Setter Property="VerticalAlignment" Value="Center" />
             </Style>
@@ -73,93 +77,39 @@
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 
-            <!-- Which number type the answer is worked out in. It sits over the result rather
-                 than beside it, because it says how to read the line underneath. Its own padding
-                 makes up the rest of the margin, so the word inside it starts directly above the
-                 equals sign. -->
-            <ComboBox
-                x:Name="EvaluatorSelector"
-                Grid.Row="0"
-                Margin="8,10,0,0"
-                HorizontalAlignment="Left"
-                Style="{StaticResource StealthComboBoxStyle}"
-                DisplayMemberPath="DisplayName"
-                SelectionChanged="EvaluatorSelectorSelectionChanged"
-                AutomationProperties.Name="Arithmetic"
-                ToolTipService.ToolTip="Which arithmetic the result is worked out in" />
-
+            <!-- The line above the result: which arithmetic on the left, and the one thing that
+                 can be done with the answer on the right. Neither belongs in the result's own
+                 line, which is left to the answer alone. The row is held at the height of the
+                 button, which is the taller of the two, so that the copy button coming and going
+                 with the answer does not lift and drop everything below it. -->
             <Grid
-                Grid.Row="1"
-                MaxHeight="256"
-                Margin="16"
-                ColumnSpacing="12">
+                Grid.Row="0"
+                Margin="8,10,8,0"
+                MinHeight="{StaticResource StealthIconButtonSize}">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <TextBlock
+                <!-- Which number type the answer is worked out in. It sits over the result rather
+                     than beside it, because it says how to read the line underneath. Its own
+                     padding makes up the rest of the margin, so the word inside it starts
+                     directly above the answer. -->
+                <ComboBox
+                    x:Name="EvaluatorSelector"
                     Grid.Column="0"
-                    VerticalAlignment="Center"
-                    FontFamily="{StaticResource MathFontFamily}"
-                    FontSize="32"
-                    Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                    Text="=" />
-
-                <!-- Only ever one of the two is shown, so they share a cell and each centres
-                     itself against the equals sign rather than stacking away from it. -->
-                <Grid Grid.Column="1">
-                    <!-- The result is markup rather than a line of text — a fraction stays a
-                         fraction, a root keeps its sign — and a rich edit box in math mode is the
-                         one thing here that can set it. Nothing is typed into it, so everything
-                         that makes it look like a box to type into is taken away: it is the same
-                         surface as the window behind it, with the answer standing on it. -->
-                    <RichEditBox
-                        x:Name="ResultBox"
-                        VerticalAlignment="Center"
-                        Padding="0"
-                        Background="Transparent"
-                        BorderBrush="Transparent"
-                        BorderThickness="0"
-                        CornerRadius="0"
-                        FontFamily="{StaticResource MathFontFamily}"
-                        FontSize="32"
-                        IsReadOnly="True"
-                        IsSpellCheckEnabled="False"
-                        IsTabStop="True"
-                        TextWrapping="Wrap"
-                        ScrollViewer.HorizontalScrollBarVisibility="Auto"
-                        ScrollViewer.VerticalScrollBarVisibility="Auto"
-                        AutomationProperties.Name="Result">
-                        <!-- The fills and outlines a text box paints itself with come from the
-                             theme by name, one per state, and are what would otherwise show a
-                             panel around the answer. Answering the lookup here, on the box
-                             itself, is what leaves it with none of them. -->
-                        <RichEditBox.Resources>
-                            <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
-                            <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="Transparent" />
-                        </RichEditBox.Resources>
-                    </RichEditBox>
-                    <TextBlock
-                        x:Name="MessageText"
-                        VerticalAlignment="Center"
-                        Style="{StaticResource BodyTextBlockStyle}"
-                        TextWrapping="Wrap"
-                        Visibility="Collapsed" />
-                </Grid>
+                    HorizontalAlignment="Left"
+                    Style="{StaticResource StealthComboBoxStyle}"
+                    DisplayMemberPath="DisplayName"
+                    SelectionChanged="EvaluatorSelectorSelectionChanged"
+                    AutomationProperties.Name="Arithmetic"
+                    ToolTipService.ToolTip="Which arithmetic the result is worked out in" />
 
                 <!-- Shown only once there is a value on the line to copy — not while the box is
                      empty, and not over a message, which has nothing to put on the clipboard. -->
                 <Button
                     x:Name="CopyResultButton"
-                    Grid.Column="2"
+                    Grid.Column="1"
                     Click="CopyResultButtonClick"
                     Style="{StaticResource StealthIconButtonStyle}"
                     Visibility="Collapsed"
@@ -170,6 +120,59 @@
                         FontSize="16"
                         Glyph="&#xE8C8;" />
                 </Button>
+            </Grid>
+
+            <Grid
+                Grid.Row="1"
+                MaxHeight="256"
+                Margin="16">
+                <!-- A message stands in for the answer rather than beside it, so the two share the
+                     row and each centres itself in it. The row is as tall as one answer whether
+                     there is one on it or not: the box below is left standing and emptied rather
+                     than taken away, so nothing moves when an answer arrives. -->
+                <!-- The result is markup rather than a line of text — a fraction stays a
+                     fraction, a root keeps its sign — and a rich edit box in math mode is the
+                     one thing here that can set it. Nothing is typed into it, so everything
+                     that makes it look like a box to type into is taken away: it is the same
+                     surface as the window behind it, with the answer standing on it. -->
+                <RichEditBox
+                    x:Name="ResultBox"
+                    VerticalAlignment="Center"
+                    Padding="0"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="0"
+                    CornerRadius="0"
+                    FontFamily="{StaticResource MathFontFamily}"
+                    FontSize="32"
+                    IsReadOnly="True"
+                    IsSpellCheckEnabled="False"
+                    IsTabStop="False"
+                    TextWrapping="Wrap"
+                    ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                    ScrollViewer.VerticalScrollBarVisibility="Auto"
+                    AutomationProperties.Name="Result">
+                    <!-- The fills and outlines a text box paints itself with come from the
+                         theme by name, one per state, and are what would otherwise show a
+                         panel around the answer. Answering the lookup here, on the box
+                         itself, is what leaves it with none of them. -->
+                    <RichEditBox.Resources>
+                        <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                        <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="Transparent" />
+                    </RichEditBox.Resources>
+                </RichEditBox>
+                <TextBlock
+                    x:Name="MessageText"
+                    VerticalAlignment="Center"
+                    Style="{StaticResource BodyTextBlockStyle}"
+                    TextWrapping="Wrap"
+                    Visibility="Collapsed" />
             </Grid>
         </Grid>
 

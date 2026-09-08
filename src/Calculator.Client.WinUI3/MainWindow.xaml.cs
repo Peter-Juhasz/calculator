@@ -333,9 +333,28 @@ public sealed partial class MainWindow : Window
     private void ShowNothing()
     {
         _result = null;
-        ResultBox.Visibility = Visibility.Collapsed;
+        ClearResult();
         MessageText.Visibility = Visibility.Collapsed;
         CopyResultButton.Visibility = Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Empties the result line while leaving the box standing where it is.
+    /// </summary>
+    /// <remarks>
+    /// Taking the box away instead would give the lower half of the window one height with an
+    /// answer on the line and another without, and everything below would lift and drop on every
+    /// keystroke that completes or breaks an expression. An empty box still stands one line high,
+    /// and that line is the same height the answer will be set on, so the room an answer needs is
+    /// held open for it from the start. It is not, however, worth stopping at on the way round the
+    /// window while there is nothing on it.
+    /// </remarks>
+    private void ClearResult()
+    {
+        ResultBox.IsReadOnly = false;
+        ResultBox.TextDocument.SetText(TextSetOptions.None, string.Empty);
+        ResultBox.IsReadOnly = true;
+        ResultBox.IsTabStop = false;
     }
 
     /// <summary>
@@ -357,7 +376,7 @@ public sealed partial class MainWindow : Window
         ApplyResultForeground();
         ResultBox.IsReadOnly = true;
 
-        ResultBox.Visibility = Visibility.Visible;
+        ResultBox.IsTabStop = true;
         MessageText.Visibility = Visibility.Collapsed;
         CopyResultButton.Visibility = Visibility.Visible;
     }
@@ -392,7 +411,7 @@ public sealed partial class MainWindow : Window
     private void ShowMessage(string message, bool isHint)
     {
         _result = null;
-        ResultBox.Visibility = Visibility.Collapsed;
+        ClearResult();
         MessageText.Text = message;
         MessageText.Foreground = (Brush)RootGrid.Resources[isHint ? "MessageHintBrush" : "MessageErrorBrush"];
         MessageText.Visibility = Visibility.Visible;
