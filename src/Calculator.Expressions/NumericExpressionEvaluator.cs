@@ -32,6 +32,12 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
     /// <inheritdoc />
     public abstract string DisplayName { get; }
 
+    /// <summary>
+    /// None. The arithmetic happens here, in a few operations on a number, so there is nothing to
+    /// be saved by holding a keystroke back and the answer keeps up with the typing.
+    /// </summary>
+    public virtual TimeSpan TypingPause => TimeSpan.Zero;
+
     /// <inheritdoc />
     public abstract ValueTask<XDocument> EvaluateAsync(string expression, CancellationToken cancellationToken);
 

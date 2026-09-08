@@ -29,6 +29,24 @@ public interface IExpressionEvaluator
     string DisplayName { get; }
 
     /// <summary>
+    /// How long the typing has to stop for before this evaluator is asked anything.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// What a reading costs is not the same from one evaluator to the next, and how long it is
+    /// worth waiting before starting one follows from that. Arithmetic done here costs nothing
+    /// worth naming, so there is nothing to be saved by waiting and the answer can follow every
+    /// keystroke; a reading that is a request to a service costs a round trip and, where the
+    /// service is paid for, a query, so it is worth letting a number be typed out in full before
+    /// asking about it.
+    /// </para>
+    /// <para>
+    /// <see cref="TimeSpan.Zero"/> means the expression is worked out as soon as it changes.
+    /// </para>
+    /// </remarks>
+    TimeSpan TypingPause { get; }
+
+    /// <summary>
     /// Works out <paramref name="expression"/> and writes its value out as the markup of one
     /// expression, with a <c>math</c> element at the root of it.
     /// </summary>

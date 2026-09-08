@@ -27,13 +27,6 @@ public sealed partial class MainWindow : Window
     private static readonly SizeInt32 InitialSize = new(720, 430);
 
     /// <summary>
-    /// How long the typing has to stop for before what was typed is worked out. Long enough that
-    /// a number being typed in is not read digit by digit, short enough that the result still
-    /// reads as following the keystroke rather than a pause after it.
-    /// </summary>
-    private static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(250);
-
-    /// <summary>
     /// The ways of working an expression out that are offered to the reader, in the order they
     /// are offered. The first is what the window starts on, so it is the one most expressions
     /// want.
@@ -41,10 +34,12 @@ public sealed partial class MainWindow : Window
     private readonly IReadOnlyList<IExpressionEvaluator> _evaluatorChoices;
 
     /// <summary>
-    /// What the box holds, as of each keystroke. Nothing here is worked out yet — the readings
-    /// this feeds are what settle which of these are.
+    /// What the box holds, as of each keystroke, and what it holds now. Nothing here is worked out
+    /// yet — the readings this feeds are what settle which of these are. What it holds now is kept
+    /// because a change of arithmetic has to be able to reach for the expression already typed
+    /// rather than wait for the next keystroke to be told what it is.
     /// </summary>
-    private readonly Subject<string> _expressions = new();
+    private readonly BehaviorSubject<string> _expressions = new(string.Empty);
 
     /// <summary>
     /// Which arithmetic the reader has settled on, as of each time they change their mind.
@@ -127,10 +122,13 @@ public sealed partial class MainWindow : Window
     /// <remarks>
     /// <para>
     /// Typing runs ahead of arithmetic, so the keystrokes are let settle first: nothing is worked
-    /// out until the typing has paused, and an expression that comes back to what was last worked
-    /// out — a character typed and rubbed out again — is not worked out a second time. A change of
-    /// arithmetic is not made to wait like that, because it is one deliberate act rather than a
-    /// run of them.
+    /// out until the typing has paused for as long as the chosen arithmetic asks to be left alone
+    /// for, and an expression that comes back to what was last worked out — a character typed and
+    /// rubbed out again — is not worked out a second time. How long that pause is belongs to the
+    /// evaluator rather than to the window: what a reading costs is what settles it, and only the
+    /// evaluator knows. A change of arithmetic is not made to wait at all, because it is one
+    /// deliberate act rather than a run of them, and the expression already typed is worked out
+    /// again the moment it is asked for in a different arithmetic.
     /// </para>
     /// <para>
     /// Each reading supersedes the one before it: the arithmetic still under way when a newer
@@ -143,10 +141,13 @@ public sealed partial class MainWindow : Window
     {
         var uiThread = SynchronizationContext.Current!;
 
-        return _expressions
-            .Throttle(TypingPause)
-            .DistinctUntilChanged(StringComparer.Ordinal)
-            .CombineLatest(_evaluators, (mathML, evaluator) => (MathML: mathML, Evaluator: evaluator))
+        return _evaluators
+            .Select(evaluator => _expressions
+                .Throttle(evaluator.TypingPause)
+                .StartWith(_expressions.Value)
+                .DistinctUntilChanged(StringComparer.Ordinal)
+                .Select(mathML => (MathML: mathML, Evaluator: evaluator)))
+            .Switch()
             .Select(reading => Observable.FromAsync(cancellationToken =>
                 ReadAsync(reading.MathML, reading.Evaluator, cancellationToken)))
             .Switch()

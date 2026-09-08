@@ -43,6 +43,12 @@ public sealed class WolframAlphaExpressionEvaluator : IExpressionEvaluator
 
     public string DisplayName => "Wolfram Alpha";
 
+    /// <summary>
+    /// A second. Every reading is a request over the network and a query against the account
+    /// behind it, so the expression is let finish being typed before one is spent on it.
+    /// </summary>
+    public TimeSpan TypingPause => TimeSpan.FromSeconds(1);
+
     /// <exception cref="ExpressionFormatException">
     /// Wolfram Alpha could not make sense of the expression.
     /// </exception>
