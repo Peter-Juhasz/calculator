@@ -9,10 +9,9 @@ namespace Calculator.Expressions;
 /// <para>
 /// An expression arrives either as one line of text or as the MathML of what is on the screen.
 /// The second is the one a caller with a math-mode edit box should hand over: what notation can
-/// be made sense of differs from one evaluator to the next — a root or a name means nothing to
-/// arithmetic done in a <see cref="decimal"/>, and a great deal to a service that does algebra —
-/// so the reading of the markup belongs to the implementation, which is the only thing that knows
-/// what it can read.
+/// be made sense of differs from one evaluator to the next — a root can be approximated in
+/// <see cref="decimal"/>, while a name needs a service that does algebra — so the reading of the
+/// markup belongs to the implementation, which is the only thing that knows what it can read.
 /// </para>
 /// <para>
 /// The answer goes back the same way it came, as MathML. Arithmetic done here has only ever the

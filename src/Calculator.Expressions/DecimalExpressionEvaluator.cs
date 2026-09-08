@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Xml.Linq;
 
 namespace Calculator.Expressions;
@@ -19,6 +20,28 @@ public sealed class DecimalExpressionEvaluator : NumericExpressionEvaluator
     private const string ResultFormat = "#,##0.#################";
 
     public override string DisplayName => "Decimal";
+
+    /// <summary>
+    /// Writes roots as fractional powers, which lets the existing power arithmetic work them out.
+    /// </summary>
+    protected override bool TryWriteAdditionalElement(XElement element, StringBuilder builder)
+    {
+        switch (element.Name.LocalName)
+        {
+            case "msqrt":
+                builder.Append('(');
+                WriteChildren(element, builder);
+                builder.Append(")^(1/2)");
+                return true;
+
+            case "mroot":
+                WritePair(element, builder, "(", ")^(1/(", "))");
+                return true;
+
+            default:
+                return false;
+        }
+    }
 
     public override ValueTask<XDocument> EvaluateAsync(string expression, CancellationToken cancellationToken)
     {

@@ -19,12 +19,14 @@ namespace Calculator.Expressions;
 /// screen becomes a division of two parenthesised halves. And the many characters that all mean
 /// the same operation — the several multiplication dots, the minus sign that is not a hyphen, the
 /// spaces that only group digits — are each reduced to the single spelling the grammar knows.
-/// What is left over, a root or a name, is turned away rather than guessed at.
+/// What is left over is offered to the particular number evaluator, which can give additional
+/// notation a spelling in this grammar, and is turned away if it cannot.
 /// </para>
 /// <para>
-/// What a subclass adds is the number type the arithmetic is done in, and the spelling of the
-/// result that follows from it. The answer is a number and nothing else, whichever type worked it
-/// out, so it goes back as the markup of one: a <c>mn</c> with the math element around it.
+/// What a subclass adds is the number type the arithmetic is done in, the notation that type can
+/// additionally work out, and the spelling of the result that follows from it. The answer is a
+/// number and nothing else, whichever type worked it out, so it goes back as the markup of one:
+/// a <c>mn</c> with the math element around it.
 /// </para>
 /// </remarks>
 public abstract class NumericExpressionEvaluator : IExpressionEvaluator
@@ -46,7 +48,7 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
     {
         ArgumentNullException.ThrowIfNull(mathML);
 
-        return EvaluateAsync(Linearize(mathML), cancellationToken);
+        return EvaluateAsync(LinearizeWithAdditionalElements(mathML), cancellationToken);
     }
 
     /// <summary>
@@ -66,11 +68,79 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
         }
 
         var builder = new StringBuilder();
-        Write(root, builder);
+        Write(root, builder, additionalElementWriter: null);
         return builder.ToString();
     }
 
-    private static void Write(XElement element, StringBuilder builder)
+    /// <summary>
+    /// Writes an element beyond the notation common to all numeric evaluators.
+    /// </summary>
+    /// <returns>
+    /// <see langword="true"/> if the element was written; otherwise <see langword="false"/>.
+    /// </returns>
+    /// <remarks>
+    /// Override this to extend the MathML an evaluator can read. Use <see cref="WriteElement"/> or
+    /// <see cref="WriteChildren"/> to write nested markup through the same extension.
+    /// </remarks>
+    protected virtual bool TryWriteAdditionalElement(XElement element, StringBuilder builder) => false;
+
+    /// <summary>
+    /// Writes one nested element using the common notation and this evaluator's extensions.
+    /// </summary>
+    protected void WriteElement(XElement element, StringBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(builder);
+
+        Write(element, builder, TryWriteAdditionalElement);
+    }
+
+    /// <summary>
+    /// Writes all nested elements using the common notation and this evaluator's extensions.
+    /// </summary>
+    protected void WriteChildren(XElement element, StringBuilder builder)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(builder);
+
+        WriteChildren(element, builder, TryWriteAdditionalElement);
+    }
+
+    /// <summary>
+    /// Writes the two nested parts of a built-up element using this evaluator's extensions.
+    /// </summary>
+    protected void WritePair(
+        XElement element,
+        StringBuilder builder,
+        string open,
+        string between,
+        string close)
+    {
+        ArgumentNullException.ThrowIfNull(element);
+        ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(open);
+        ArgumentNullException.ThrowIfNull(between);
+        ArgumentNullException.ThrowIfNull(close);
+
+        WritePair(element, builder, open, between, close, TryWriteAdditionalElement);
+    }
+
+    private string LinearizeWithAdditionalElements(XDocument mathML)
+    {
+        if (mathML.Root is not { } root)
+        {
+            return string.Empty;
+        }
+
+        var builder = new StringBuilder();
+        Write(root, builder, TryWriteAdditionalElement);
+        return builder.ToString();
+    }
+
+    private static void Write(
+        XElement element,
+        StringBuilder builder,
+        Func<XElement, StringBuilder, bool>? additionalElementWriter)
     {
         switch (element.Name.LocalName)
         {
@@ -78,7 +148,7 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
             case "mrow":
             case "mstyle":
             case "mpadded":
-                WriteChildren(element, builder);
+                WriteChildren(element, builder, additionalElementWriter);
                 break;
 
             // Presentation markup first, then an annotation saying the same thing another way.
@@ -87,7 +157,7 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
                 var presentation = element.Elements().FirstOrDefault();
                 if (presentation is not null)
                 {
-                    Write(presentation, builder);
+                    Write(presentation, builder, additionalElementWriter);
                 }
 
                 break;
@@ -103,16 +173,16 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
                 break;
 
             case "mfrac":
-                WritePair(element, builder, "(", ")/(", ")");
+                WritePair(element, builder, "(", ")/(", ")", additionalElementWriter);
                 break;
 
             case "msup":
-                WritePair(element, builder, "(", ")^(", ")");
+                WritePair(element, builder, "(", ")^(", ")", additionalElementWriter);
                 break;
 
             case "mfenced":
                 builder.Append('(');
-                WriteChildren(element, builder);
+                WriteChildren(element, builder, additionalElementWriter);
                 builder.Append(')');
                 break;
 
@@ -128,16 +198,24 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
                 break;
 
             default:
-                throw new ExpressionFormatException(
-                    "Only the four operations, powers, factorials and parentheses are supported so far.");
+                if (additionalElementWriter?.Invoke(element, builder) != true)
+                {
+                    throw new ExpressionFormatException(
+                        "Only the four operations, powers, factorials and parentheses are supported so far.");
+                }
+
+                break;
         }
     }
 
-    private static void WriteChildren(XElement element, StringBuilder builder)
+    private static void WriteChildren(
+        XElement element,
+        StringBuilder builder,
+        Func<XElement, StringBuilder, bool>? additionalElementWriter)
     {
         foreach (var child in element.Elements())
         {
-            Write(child, builder);
+            Write(child, builder, additionalElementWriter);
         }
     }
 
@@ -150,7 +228,13 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
     /// where it begins and ends, so a fraction bar groups everything above and below it and a
     /// raised position groups the whole exponent; written flat, only parentheses can say that.
     /// </remarks>
-    private static void WritePair(XElement element, StringBuilder builder, string open, string between, string close)
+    private static void WritePair(
+        XElement element,
+        StringBuilder builder,
+        string open,
+        string between,
+        string close,
+        Func<XElement, StringBuilder, bool>? additionalElementWriter)
     {
         var parts = element.Elements().ToArray();
 
@@ -160,9 +244,9 @@ public abstract class NumericExpressionEvaluator : IExpressionEvaluator
         }
 
         builder.Append(open);
-        Write(parts[0], builder);
+        Write(parts[0], builder, additionalElementWriter);
         builder.Append(between);
-        Write(parts[1], builder);
+        Write(parts[1], builder, additionalElementWriter);
         builder.Append(close);
     }
 

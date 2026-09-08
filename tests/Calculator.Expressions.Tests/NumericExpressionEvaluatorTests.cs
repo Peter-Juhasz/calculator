@@ -139,10 +139,60 @@ public sealed class NumericExpressionEvaluatorTests
     }
 
     [TestMethod]
-    public void Linearize_ARoot_IsRejectedForNow()
+    public void Linearize_ARoot_IsNotPartOfTheCommonNumericNotation()
     {
         Assert.ThrowsExactly<ExpressionFormatException>(
             () => Linearize(Document("<msqrt><mn>9</mn></msqrt>")));
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_ASquareRootHandedToADecimal_IsWorkedOutAsAPower()
+    {
+        var result = await new DecimalExpressionEvaluator().EvaluateAsync(
+            XDocument.Parse(Document("<msqrt><mn>9</mn></msqrt>")),
+            CancellationToken.None);
+
+        Assert.AreEqual("3", MathML.AsNumber(result));
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_ASquareRootCanContainBuiltUpNotation()
+    {
+        var result = await new DecimalExpressionEvaluator().EvaluateAsync(
+            XDocument.Parse(Document(
+                "<msqrt><mrow><mn>1</mn><mo>+</mo><mfrac><mn>24</mn><mn>3</mn></mfrac></mrow></msqrt>")),
+            CancellationToken.None);
+
+        Assert.AreEqual("3", MathML.AsNumber(result));
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_ARootOfAnyDegreeHandedToADecimal_IsWorkedOutAsAPower()
+    {
+        var result = await new DecimalExpressionEvaluator().EvaluateAsync(
+            XDocument.Parse(Document("<mroot><mn>81</mn><mn>4</mn></mroot>")),
+            CancellationToken.None);
+
+        Assert.AreEqual("3", MathML.AsNumber(result));
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_ANestedRootUsesTheSameDecimalExtension()
+    {
+        var result = await new DecimalExpressionEvaluator().EvaluateAsync(
+            XDocument.Parse(Document("<msqrt><msqrt><mn>16</mn></msqrt></msqrt>")),
+            CancellationToken.None);
+
+        Assert.AreEqual("2", MathML.AsNumber(result));
+    }
+
+    [TestMethod]
+    public async Task EvaluateAsync_ARootHandedToWholeNumbers_IsStillRejected()
+    {
+        await Assert.ThrowsExactlyAsync<ExpressionFormatException>(
+            async () => await new BigIntegerExpressionEvaluator().EvaluateAsync(
+                XDocument.Parse(Document("<msqrt><mn>9</mn></msqrt>")),
+                CancellationToken.None));
     }
 
     [TestMethod]
