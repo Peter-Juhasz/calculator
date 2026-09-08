@@ -127,10 +127,10 @@
                         FontSize="32"
                         IsReadOnly="True"
                         IsSpellCheckEnabled="False"
-                        IsTabStop="False"
+                        IsTabStop="True"
                         TextWrapping="Wrap"
-                        ScrollViewer.HorizontalScrollBarVisibility="Hidden"
-                        ScrollViewer.VerticalScrollBarVisibility="Hidden"
+                        ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                        ScrollViewer.VerticalScrollBarVisibility="Auto"
                         AutomationProperties.Name="Result">
                         <!-- The fills and outlines a text box paints itself with come from the
                              theme by name, one per state, and are what would otherwise show a
