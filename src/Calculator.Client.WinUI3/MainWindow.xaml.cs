@@ -63,7 +63,7 @@ public sealed partial class MainWindow : Window
     {
         ArgumentNullException.ThrowIfNull(evaluators);
 
-        _evaluatorChoices = [.. evaluators];
+        _evaluatorChoices = evaluators.ToList();
 
         InitializeComponent();
         ConfigureWindowChrome();
