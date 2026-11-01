@@ -14,6 +14,7 @@ using System.Xml.Linq;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics;
 using Windows.System;
+using WinRT;
 
 namespace Calculator.Client.WinUI3;
 
@@ -110,9 +111,19 @@ public sealed partial class MainWindow : Window
     /// Fills the selector and settles on the first of the evaluators, so the window always has
     /// one in hand before there is anything to work out.
     /// </summary>
+    /// <remarks>
+    /// The evaluators go into the selector's own item collection one by one rather than as its
+    /// items source. Compiled ahead of time, a .NET list handed to XAML needs interop generated for
+    /// it at build time, and none is for a list of a type XAML knows nothing of — the window then
+    /// fails to open. The selector's own collection takes each evaluator as a plain object.
+    /// </remarks>
     private void ConfigureEvaluators()
     {
-        EvaluatorSelector.ItemsSource = _evaluatorChoices;
+        foreach (var evaluator in _evaluatorChoices)
+        {
+            EvaluatorSelector.Items.Add(evaluator);
+        }
+
         EvaluatorSelector.SelectedIndex = 0;
     }
 
@@ -394,7 +405,20 @@ public sealed partial class MainWindow : Window
     /// </remarks>
     private void ApplyResultForeground()
     {
-        if (ResultBox.Foreground is not SolidColorBrush brush)
+        if (ResultBox.Foreground is not { } foreground)
+        {
+            return;
+        }
+
+        // compiled ahead of time, the brush comes back wrapped as the Brush the property is
+        // declared as rather than the SolidColorBrush it is, so a type test never matches; As
+        // asks the object itself instead
+        SolidColorBrush brush;
+        try
+        {
+            brush = foreground.As<SolidColorBrush>();
+        }
+        catch (InvalidCastException)
         {
             return;
         }

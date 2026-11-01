@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Calculator.Expressions.WolframAlpha;
 
@@ -13,11 +14,6 @@ namespace Calculator.Expressions.WolframAlpha;
 public static class WolframAlphaQueryResultReader
 {
     /// <summary>
-    /// The names on the wire are lower case throughout, which is what the web defaults read.
-    /// </summary>
-    private static readonly JsonSerializerOptions Options = new(JsonSerializerDefaults.Web);
-
-    /// <summary>
     /// Reads <paramref name="json"/> as the answer to one query.
     /// </summary>
     /// <exception cref="WolframAlphaException">
@@ -29,7 +25,7 @@ public static class WolframAlphaQueryResultReader
 
         try
         {
-            return Unwrap(JsonSerializer.Deserialize<WolframAlphaAnswer>(json, Options));
+            return Unwrap(JsonSerializer.Deserialize(json, WolframAlphaJsonContext.Default.WolframAlphaAnswer));
         }
         catch (JsonException exception)
         {
@@ -52,7 +48,10 @@ public static class WolframAlphaQueryResultReader
         try
         {
             return Unwrap(
-                await JsonSerializer.DeserializeAsync<WolframAlphaAnswer>(stream, Options, cancellationToken));
+                await JsonSerializer.DeserializeAsync(
+                    stream,
+                    WolframAlphaJsonContext.Default.WolframAlphaAnswer,
+                    cancellationToken));
         }
         catch (JsonException exception)
         {
@@ -64,8 +63,20 @@ public static class WolframAlphaQueryResultReader
         answer?.QueryResult
         ?? throw new WolframAlphaException("Wolfram Alpha sent back something other than an answer.");
 
-    /// <summary>
-    /// The one thing an answer is wrapped in, and the only reason this exists.
-    /// </summary>
-    private sealed record WolframAlphaAnswer(WolframAlphaQueryResult? QueryResult);
 }
+
+/// <summary>
+/// The one thing an answer is wrapped in, and the only reason this exists.
+/// </summary>
+internal sealed record WolframAlphaAnswer(WolframAlphaQueryResult? QueryResult);
+
+/// <summary>
+/// The reading of an answer, worked out at compile time so that nothing has to be discovered by
+/// reflection when the app is compiled ahead of time.
+/// </summary>
+/// <remarks>
+/// The names on the wire are lower case throughout, which is what the web defaults read.
+/// </remarks>
+[JsonSourceGenerationOptions(JsonSerializerDefaults.Web)]
+[JsonSerializable(typeof(WolframAlphaAnswer))]
+internal sealed partial class WolframAlphaJsonContext : JsonSerializerContext;

@@ -1,6 +1,15 @@
 using System.ComponentModel.DataAnnotations;
 
+using Microsoft.Extensions.Options;
+
 namespace Calculator.Expressions.WolframAlpha;
+
+/// <summary>
+/// Checks <see cref="WolframAlphaOptions"/> against its annotations, with the checking written out
+/// at compile time rather than discovered by reflection.
+/// </summary>
+[OptionsValidator]
+internal sealed partial class WolframAlphaOptionsValidator : IValidateOptions<WolframAlphaOptions>;
 
 /// <summary>
 /// What is needed to ask Wolfram Alpha anything, and how long to wait for it.

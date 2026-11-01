@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Calculator.Expressions.WolframAlpha;
 
@@ -27,12 +28,19 @@ internal sealed class WolframAlphaErrorConverter : JsonConverter<WolframAlphaErr
 
         // This converter is asked for by the one property that needs it rather than registered for
         // the type, so reading the object is the ordinary reading of it and not this again.
-        return JsonSerializer.Deserialize<WolframAlphaError>(ref reader, options);
+        return JsonSerializer.Deserialize(ref reader, GetTypeInfo(options));
     }
 
     public override void Write(
         Utf8JsonWriter writer,
         WolframAlphaError? value,
         JsonSerializerOptions options) =>
-        JsonSerializer.Serialize(writer, value, options);
+        JsonSerializer.Serialize(writer, value, GetTypeInfo(options));
+
+    /// <summary>
+    /// The contract for the object itself, from whatever the options were built from — the
+    /// generated context, ordinarily — rather than worked out by reflection.
+    /// </summary>
+    private static JsonTypeInfo<WolframAlphaError?> GetTypeInfo(JsonSerializerOptions options) =>
+        (JsonTypeInfo<WolframAlphaError?>)options.GetTypeInfo(typeof(WolframAlphaError));
 }

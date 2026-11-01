@@ -3,6 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:muxc="using:Microsoft.UI.Xaml.Controls"
+    xmlns:expressions="using:Calculator.Expressions"
     Title="Calculator">
 
     <!-- The window itself is the split: what was typed in the upper half, what it comes to in
@@ -100,10 +101,17 @@
                     Grid.Column="0"
                     HorizontalAlignment="Left"
                     Style="{StaticResource StealthComboBoxStyle}"
-                    DisplayMemberPath="DisplayName"
                     SelectionChanged="EvaluatorSelectorSelectionChanged"
                     AutomationProperties.Name="Arithmetic"
-                    ToolTipService.ToolTip="Which arithmetic the result is worked out in" />
+                    ToolTipService.ToolTip="Which arithmetic the result is worked out in">
+                    <!-- A compiled binding rather than DisplayMemberPath, which looks the name up
+                         by reflection and finds nothing once the app is compiled ahead of time. -->
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="expressions:IExpressionEvaluator">
+                            <TextBlock Text="{x:Bind DisplayName}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
 
                 <!-- Shown only once there is a value on the line to copy — not while the box is
                      empty, and not over a message, which has nothing to put on the clipboard. -->

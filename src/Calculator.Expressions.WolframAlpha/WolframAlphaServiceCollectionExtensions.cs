@@ -27,11 +27,13 @@ public static class WolframAlphaServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
+        // both the binding and the validation are source generated, so neither needs reflection
         services
             .AddOptions<WolframAlphaOptions>()
             .Bind(configuration)
-            .ValidateDataAnnotations()
             .ValidateOnStart();
+
+        services.AddSingleton<IValidateOptions<WolframAlphaOptions>, WolframAlphaOptionsValidator>();
 
         services
             .AddHttpClient<WolframAlphaFullResultsClient>(

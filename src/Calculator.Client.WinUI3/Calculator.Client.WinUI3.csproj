@@ -18,6 +18,12 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <EnableMsixTooling>false</EnableMsixTooling>
 
+    <!-- Compiled ahead of time when published. The SDK's shortcut for an AOT publish runs only
+         Compile, and the XAML compiler it pulls in early then sees no references and fails with
+         WMC1007; the PRI file the target below publishes is also only made by a full build. -->
+    <PublishAot>true</PublishAot>
+    <UseOptimizedPublish>false</UseOptimizedPublish>
+
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
