@@ -192,6 +192,14 @@
             Height="48"
             VerticalAlignment="Top"
             Title="Calculator"
-            Background="Transparent" />
+            Background="Transparent">
+            <muxc:TitleBar.IconSource>
+                <muxc:ImageIconSource>
+                    <muxc:ImageIconSource.ImageSource>
+                        <SvgImageSource UriSource="ms-appx:///Assets/AppIcon.svg" />
+                    </muxc:ImageIconSource.ImageSource>
+                </muxc:ImageIconSource>
+            </muxc:TitleBar.IconSource>
+        </muxc:TitleBar>
     </Grid>
 </Window>

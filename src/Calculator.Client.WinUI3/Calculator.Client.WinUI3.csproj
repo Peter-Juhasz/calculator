@@ -10,6 +10,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>calculator</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
 
     <!-- Unpackaged (no MSIX): the app carries its own copy of the Windows App SDK runtime,
@@ -48,6 +49,13 @@
     <None Update="appsettings.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="appsettings.local.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include=".env" Condition="Exists('.env')" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The window's icon is loaded from beside the exe, and the title bar's through ms-appx,
+         which for an unpackaged app also resolves to there. -->
+    <Content Include="Assets\AppIcon.svg" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Every compiled XAML page is indexed into Acc.pri rather than written beside the exe, and the

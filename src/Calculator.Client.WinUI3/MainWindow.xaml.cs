@@ -97,6 +97,7 @@ public sealed partial class MainWindow : Window
         Title = "Calculator";
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
 
         if (DesktopAcrylicController.IsSupported())
         {
