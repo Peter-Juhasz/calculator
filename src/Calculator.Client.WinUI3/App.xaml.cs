@@ -21,9 +21,6 @@ public partial class App : Application
         InitializeComponent();
 
         _services = BuildServices();
-
-        // HACK: fix for sluggish UI on Windows 11, see https://github.com/microsoft/microsoft-ui-xaml/issues/11144
-        CompositionTarget.Rendering += (_, _) => { };
     }
 
     protected override void OnLaunched(LaunchActivatedEventArgs args)

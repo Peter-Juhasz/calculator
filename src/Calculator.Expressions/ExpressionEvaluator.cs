@@ -361,6 +361,16 @@ public static class ExpressionEvaluator
                 throw new OverflowException("The result is too large.");
             }
 
+            // since .net 11 a double converts to a decimal exactly, which would show digits the
+            // double never held, so a decimal is given the 15 significant digits a double does.
+            if (typeof(T) == typeof(decimal))
+            {
+                return T.CreateChecked(decimal.Parse(
+                    approximation.ToString("G15", CultureInfo.InvariantCulture),
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture));
+            }
+
             return T.CreateChecked(approximation);
         }
 

@@ -140,6 +140,13 @@ public sealed class ExpressionEvaluatorTests
     }
 
     [TestMethod]
+    public void Evaluate_AFractionalPower_CarriesOnlyTheDigitsADoubleHas()
+    {
+        // a double converts to a decimal exactly since .net 11, which would show digits it never had.
+        Assert.AreEqual(1.4142135623731m, ExpressionEvaluator.Evaluate("2^0.5"));
+    }
+
+    [TestMethod]
     public void Evaluate_AFractionalPowerOfANegativeNumber_HasNoAnswer()
     {
         Assert.ThrowsExactly<ArithmeticException>(() => ExpressionEvaluator.Evaluate("(0-8)^0.5"));

@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <TargetFramework>net11.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.26100.0</TargetPlatformMinVersion>
     <SupportedOSPlatformVersion>10.0.26100.0</SupportedOSPlatformVersion>
     <RootNamespace>Calculator.Client.WinUI3</RootNamespace>
@@ -12,6 +12,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
+    <!-- The experimental Windows App SDK's generated XamlTypeInfo.g.cs references its own
+         [Experimental] metadata providers (Charts, Tabular). -->
+    <NoWarn>$(NoWarn);CS8305</NoWarn>
 
     <!-- Unpackaged (no MSIX): the app carries its own copy of the Windows App SDK runtime,
          so it runs on a machine where that runtime was never installed. -->
@@ -23,7 +26,6 @@
          Compile, and the XAML compiler it pulls in early then sees no references and fails with
          WMC1007; the PRI file the target below publishes is also only made by a full build. -->
     <PublishAot>true</PublishAot>
-    <UseOptimizedPublish>false</UseOptimizedPublish>
 
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
@@ -32,10 +34,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.*" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.*" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.*" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="11.*" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="11.*" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.*" />
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.*-experimental*" />
     <PackageReference Include="System.Reactive" Version="7.*" />
   </ItemGroup>
 
