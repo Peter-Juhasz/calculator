@@ -43,8 +43,8 @@
     <!-- Only the components the app uses rather than the Microsoft.WindowsAppSDK metapackage,
          whose ML component copies ONNX Runtime and DirectML (~40 MB) beside the exe even when the
          rest of the SDK comes from the installed runtime. Runtime is what makes it framework-dependent. -->
-    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.7.*" />
-    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.7.*" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.*" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.*" />
     <PackageReference Include="System.Reactive" Version="7.*" />
   </ItemGroup>
 
