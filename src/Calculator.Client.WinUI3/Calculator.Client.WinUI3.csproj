@@ -12,20 +12,23 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
-    <!-- The experimental Windows App SDK's generated XamlTypeInfo.g.cs references its own
-         [Experimental] metadata providers (Charts, Tabular). -->
-    <NoWarn>$(NoWarn);CS8305</NoWarn>
 
-    <!-- Unpackaged (no MSIX): the app carries its own copy of the Windows App SDK runtime,
-         so it runs on a machine where that runtime was never installed. -->
+    <!-- Unpackaged (no MSIX), and framework-dependent on the Windows App Runtime 2 installed on
+         the machine rather than carrying its own ~125 MB copy. Current Windows 11 already has it,
+         kept up to date by the Store for its own inbox apps (Notepad, Photos); where it is
+         missing or older than the version built against, the bootstrapper offers to install it. -->
     <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
     <EnableMsixTooling>false</EnableMsixTooling>
 
     <!-- Compiled ahead of time when published. The SDK's shortcut for an AOT publish runs only
          Compile, and the XAML compiler it pulls in early then sees no references and fails with
          WMC1007; the PRI file the target below publishes is also only made by a full build. -->
     <PublishAot>true</PublishAot>
+
+    <!-- The native symbols are four times the size of the exe they describe. They are still
+         written to the build output for local debugging, just not shipped. -->
+    <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
 
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
@@ -37,7 +40,11 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="11.*" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="11.*" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.*" />
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.*-experimental*" />
+    <!-- Only the components the app uses rather than the Microsoft.WindowsAppSDK metapackage,
+         whose ML component copies ONNX Runtime and DirectML (~40 MB) beside the exe even when the
+         rest of the SDK comes from the installed runtime. Runtime is what makes it framework-dependent. -->
+    <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.7.*" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.7.*" />
     <PackageReference Include="System.Reactive" Version="7.*" />
   </ItemGroup>
 
@@ -59,6 +66,14 @@
     <Content Include="Assets\AppIcon.svg" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="Assets\AppIcon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- The referenced projects' managed symbols describe IL that native compilation has already
+       folded into the exe, so they are of no use beside it. -->
+  <Target Name="OmitReferencedSymbolsFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
 
   <!-- Every compiled XAML page is indexed into Acc.pri rather than written beside the exe, and the
        WinUI targets copy that file to the build output without ever offering it to the publish
