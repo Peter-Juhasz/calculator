@@ -30,6 +30,9 @@
          written to the build output for local debugging, just not shipped. -->
     <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
 
+    <!-- No WebView2 is ever created, so its WinRT component is not copied beside the exe. -->
+    <WebView2EnableCsWinRTProjectionExcludeCoreRef>true</WebView2EnableCsWinRTProjectionExcludeCoreRef>
+
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == '' And '$(Platform)' == 'ARM64'">win-arm64</RuntimeIdentifier>
@@ -45,6 +48,9 @@
          rest of the SDK comes from the installed runtime. Runtime is what makes it framework-dependent. -->
     <PackageReference Include="Microsoft.WindowsAppSDK.Runtime" Version="2.*" />
     <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" Version="2.*" />
+    <!-- Brought in by WinUI for its WebView2 control, which the app does not use; referenced
+         directly only to keep its native loader out of the output. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.*" ExcludeAssets="native" />
     <PackageReference Include="System.Reactive" Version="7.*" />
   </ItemGroup>
 
